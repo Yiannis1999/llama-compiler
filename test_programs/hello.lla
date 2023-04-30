@@ -1,0 +1,14 @@
+(*
+AST(
+    Letdef(
+        0,
+        Def(
+            main,
+            [],
+            Type_Unit(),
+            call(print_string, (Str_Expr("Hello world!\n")))
+        )
+    )
+)
+*)
+let main = print_string "Hello world!\n"
