@@ -52,14 +52,14 @@ void Type_Func::printOn(std::ostream &out) const
 
 void Type_Ref::printOn(std::ostream &out) const
 {
-  out << "Type_Ref(" << *t << ")";
+  out << "Type_Ref(" << *typ << ")";
 }
 
 // Class Type_Array
 
 void Type_Array::printOn(std::ostream &out) const
 {
-  out << "Type_Array(" << dim << ", " << *t << ")";
+  out << "Type_Array(" << dim << ", " << *typ << ")";
 }
 
 // class Type_id
@@ -73,10 +73,10 @@ void Type_id::printOn(std::ostream &out) const
 
 void Type_Undefined::printOn(std::ostream &out) const
 {
-  if (t == nullptr)
+  if (typ == nullptr)
     out << "Type_Undefined()";
   else
-    out << *t;
+    out << *typ;
 }
 
 // class Int_Expr
@@ -97,7 +97,7 @@ void Float_Expr::printOn(std::ostream &out) const
 
 void Char_Expr::printOn(std::ostream &out) const
 {
-  out << "Char_Expr(" << chr << ")";
+  out << "Char_Expr(" << ch << ")";
 }
 
 // class Str_Expr
@@ -111,7 +111,7 @@ void Str_Expr::printOn(std::ostream &out) const
 
 void Bool_Expr::printOn(std::ostream &out) const
 {
-  out << "Bool_Expr(" << var << ")";
+  out << "Bool_Expr(" << boolean << ")";
 }
 
 // class Unit_Expr
@@ -167,7 +167,7 @@ void call::printOn(std::ostream &out) const
 
 void UnOp::printOn(std::ostream &out) const
 {
-  out << "Unop(" << op << ", " << *e << ")";
+  out << "Unop(" << op << ", " << *expr << ")";
 }
 
 // class BinOp
@@ -210,14 +210,14 @@ void Pattern_Float_Expr::printOn(std::ostream &out) const
 
 void Pattern_Char_Expr::printOn(std::ostream &out) const
 {
-  out << "Pattern_Char_Expr(" << chr << ")";
+  out << "Pattern_Char_Expr(" << ch << ")";
 }
 
 // class Pattern_Bool_Expr
 
 void Pattern_Bool_Expr::printOn(std::ostream &out) const
 {
-  out << "Pattern_Bool_Expr(" << var << ")";
+  out << "Pattern_Bool_Expr(" << boolean << ")";
 }
 
 // class Pattern_id
@@ -245,14 +245,14 @@ void Pattern_Call::printOn(std::ostream &out) const
 
 void Clause::printOn(std::ostream &out) const
 {
-  out << "Clause(" << *p << ", " << *e << ")";
+  out << "Clause(" << *par << ", " << *expr << ")";
 }
 
 // class Match
 
 void Match::printOn(std::ostream &out) const
 {
-  out << "Match(" << *e << ", " << *vec << ")";
+  out << "Match(" << *expr << ", " << *vec << ")";
 }
 
 // class Constr
@@ -270,8 +270,8 @@ void Constr::printOn(std::ostream &out) const
 void Par::printOn(std::ostream &out) const
 {
   out << "Par(" << id;
-  if (t != nullptr)
-    out << ", " << *t;
+  if (typ != nullptr)
+    out << ", " << *typ;
   out << ")";
 }
 

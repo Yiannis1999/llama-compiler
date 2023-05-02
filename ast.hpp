@@ -219,6 +219,7 @@ public:
   Type_Unit() {}
   virtual void printOn(std::ostream &out) const override;
   virtual main_type get_type() override;
+  virtual llvm::Type *compile() const override { return voi; };
 };
 
 class Type_Int : public ::Type
@@ -276,7 +277,7 @@ private:
 class Type_Ref : public ::Type
 {
 public:
-  Type_Ref(::Type *t) : t(t) {}
+  Type_Ref(::Type *t) : typ(t) {}
   virtual void printOn(std::ostream &out) const override;
   virtual main_type get_type() override;
   virtual ::Type *getChild1() override;
@@ -284,23 +285,24 @@ public:
   virtual void sem() override;
 
 private:
-  ::Type *t;
+  ::Type *typ;
 };
 
 class Type_Array : public ::Type
 {
 public:
-  Type_Array(long unsigned int i, ::Type *t1) : dim(i), t(t1) {}
+  Type_Array(long unsigned int i, ::Type *t1) : dim(i), typ(t1) {}
   virtual void printOn(std::ostream &out) const override;
   virtual main_type get_type() override;
   virtual ::Type *getChild1() override;
   virtual long unsigned int getDimensions() override;
   virtual bool equals(::Type *other) override;
   virtual void sem() override;
+  virtual llvm::Type *compile() const override { return PointerType::get(i8, 0); };
 
 private:
   long unsigned int dim;
-  ::Type *t;
+  ::Type *typ;
 };
 
 class Type_id : public ::Type
@@ -320,7 +322,7 @@ private:
 class Type_Undefined : public ::Type
 {
 public:
-  Type_Undefined() : t(nullptr) {}
+  Type_Undefined() : typ(nullptr) {}
   virtual void printOn(std::ostream &out) const override;
   virtual main_type get_type() override;
   virtual ::Type *getChild1() override;
@@ -328,17 +330,17 @@ public:
   virtual long unsigned int getDimensions() override;
   virtual std::string get_id() override;
   virtual bool equals(::Type *other) override;
-  virtual llvm::Type *compile() const override { return t->compile(); };
+  virtual llvm::Type *compile() const override { return typ == nullptr ? i64 : typ->compile(); };
 
 private:
-  ::Type *t;
+  ::Type *typ;
 };
 
 class Expr : public AST
 {
 public:
   virtual void type_check(::Type *t);
-  ::Type *t;
+  ::Type *typ;
   virtual Value *compile() const { return nullptr; };
 };
 
@@ -369,32 +371,32 @@ private:
 class Char_Expr : public Expr
 {
 public:
-  Char_Expr(std::string s) : chr(s[1])
+  Char_Expr(std::string s) : ch(s[1])
   {
     if (s[1] == '\\')
     {
       switch (s[2])
       {
       case 'n':
-        chr = '\n';
+        ch = '\n';
         break;
       case 't':
-        chr = '\t';
+        ch = '\t';
         break;
       case 'r':
-        chr = '\r';
+        ch = '\r';
         break;
       case '0':
-        chr = '\0';
+        ch = '\0';
         break;
       case '\\':
-        chr = '\\';
+        ch = '\\';
         break;
       case '\'':
-        chr = '\'';
+        ch = '\'';
         break;
       case '\"':
-        chr = '\"';
+        ch = '\"';
         break;
       case 'x':
       {
@@ -402,7 +404,7 @@ public:
         hex_str += s[3];
         hex_str += s[4];
         char hex_value = std::stoi(hex_str, nullptr, 16);
-        chr = hex_value;
+        ch = hex_value;
         break;
       }
       }
@@ -413,7 +415,7 @@ public:
   virtual Value *compile() const override;
 
 private:
-  char chr;
+  char ch;
 };
 
 class Str_Expr : public Expr
@@ -477,13 +479,13 @@ private:
 class Bool_Expr : public Expr
 {
 public:
-  Bool_Expr(bool b) : var(b) {}
+  Bool_Expr(bool b) : boolean(b) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   virtual Value *compile() const override;
 
 private:
-  bool var;
+  bool boolean;
 };
 
 class Unit_Expr : public Expr
@@ -596,13 +598,13 @@ private:
 class UnOp : public Expr
 {
 public:
-  UnOp(unop_enum op1, Expr *e1) : op(op1), e(e1) {}
+  UnOp(unop_enum op1, Expr *e1) : op(op1), expr(e1) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
 
 private:
   unop_enum op;
-  Expr *e;
+  Expr *expr;
 };
 
 class BinOp : public Expr
@@ -644,7 +646,7 @@ class Pattern : public AST
 {
 public:
   virtual void sem() {}
-  ::Type *t;
+  ::Type *typ;
 };
 
 class Pattern_Int_Expr : public Pattern
@@ -672,32 +674,32 @@ private:
 class Pattern_Char_Expr : public Pattern
 {
 public:
-  Pattern_Char_Expr(std::string s) : chr(s[1])
+  Pattern_Char_Expr(std::string s) : ch(s[1])
   {
     if (s[1] == '\\')
     {
       switch (s[2])
       {
       case 'n':
-        chr = '\n';
+        ch = '\n';
         break;
       case 't':
-        chr = '\t';
+        ch = '\t';
         break;
       case 'r':
-        chr = '\r';
+        ch = '\r';
         break;
       case '0':
-        chr = '\0';
+        ch = '\0';
         break;
       case '\\':
-        chr = '\\';
+        ch = '\\';
         break;
       case '\'':
-        chr = '\'';
+        ch = '\'';
         break;
       case '\"':
-        chr = '\"';
+        ch = '\"';
         break;
       case 'x':
       {
@@ -705,7 +707,7 @@ public:
         hex_str += s[3];
         hex_str += s[4];
         char hex_value = std::stoi(hex_str, nullptr, 16);
-        chr = hex_value;
+        ch = hex_value;
         break;
       }
       }
@@ -715,18 +717,18 @@ public:
   virtual void sem() override;
 
 private:
-  char chr;
+  char ch;
 };
 
 class Pattern_Bool_Expr : public Pattern
 {
 public:
-  Pattern_Bool_Expr(bool b) : var(b) {}
+  Pattern_Bool_Expr(bool b) : boolean(b) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
 
 private:
-  bool var;
+  bool boolean;
 };
 
 class Pattern_id : public Pattern
@@ -767,21 +769,21 @@ private:
 class Clause : public AST
 {
 public:
-  Clause(Pattern *p1, Expr *e1) : p(p1), e(e1) {}
+  Clause(Pattern *p1, Expr *e1) : par(p1), expr(e1) {}
   virtual void printOn(std::ostream &out) const override;
-  Pattern *p;
-  Expr *e;
+  Pattern *par;
+  Expr *expr;
 };
 
 class Match : public Expr
 {
 public:
-  Match(Expr *e1, std::vector<Clause *> *v) : e(e1), vec(v) {}
+  Match(Expr *e1, std::vector<Clause *> *v) : expr(e1), vec(v) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
 
 private:
-  Expr *e;
+  Expr *expr;
   std::vector<Clause *> *vec;
 };
 
@@ -800,10 +802,10 @@ private:
 class Par : public AST
 {
 public:
-  Par(std::string s, ::Type *typ) : t(typ), id(s) {}
+  Par(std::string s, ::Type *t) : typ(t), id(s) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
-  ::Type *t;
+  ::Type *typ;
 
 private:
   std::string id;
@@ -857,8 +859,8 @@ private:
 class NormalDef : public Def
 {
 public:
-  NormalDef(std::string id1, std::vector<Par *> *v, ::Type *t, Expr *e)
-      : id(id1), par_vec(v), typ(t), expr(e) {}
+  NormalDef(std::string s, std::vector<Par *> *v, ::Type *t, Expr *e)
+      : id(s), par_vec(v), typ(t), expr(e) {}
 
   virtual void sem() override;
   virtual void sem2() override;
@@ -888,7 +890,7 @@ private:
 class LetIn : public Expr
 {
 public:
-  LetIn(LetDef *d, Expr *e1) : def(d), expr(e1) {}
+  LetIn(LetDef *d, Expr *e) : def(d), expr(e) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
 

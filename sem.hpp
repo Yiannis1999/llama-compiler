@@ -142,7 +142,7 @@ void Type_Func::sem()
 
 main_type Type_Ref::get_type() { return type_ref; }
 
-::Type *Type_Ref::getChild1() { return t; }
+::Type *Type_Ref::getChild1() { return typ; }
 
 bool Type_Ref::equals(::Type *other)
 {
@@ -152,16 +152,16 @@ bool Type_Ref::equals(::Type *other)
     return other->equals(this);
   if (this->get_type() != other->get_type())
     return false;
-  return t->equals(other->getChild1());
+  return typ->equals(other->getChild1());
 }
 
-void Type_Ref::sem() { t->sem(); }
+void Type_Ref::sem() { typ->sem(); }
 
 // class Type_Array
 
 main_type Type_Array::get_type() { return type_array; }
 
-::Type *Type_Array::getChild1() { return t; }
+::Type *Type_Array::getChild1() { return typ; }
 
 long unsigned int Type_Array::getDimensions() { return dim; }
 
@@ -173,9 +173,9 @@ bool Type_Array::equals(::Type *other)
     return other->equals(this);
   if (this->get_type() != other->get_type())
     return false;
-  return t->equals(other->getChild1()) && dim == other->getDimensions();
+  return typ->equals(other->getChild1()) && dim == other->getDimensions();
 }
-void Type_Array::sem() { t->sem(); }
+void Type_Array::sem() { typ->sem(); }
 
 // class Type_id
 
@@ -200,27 +200,27 @@ void Type_id::sem() { tt.lookup(id); }
 
 main_type Type_Undefined::get_type()
 {
-  return t == nullptr ? type_undefined : t->get_type();
+  return typ == nullptr ? type_undefined : typ->get_type();
 }
 
 ::Type *Type_Undefined::getChild1()
 {
-  return t == nullptr ? this : t->getChild1();
+  return typ == nullptr ? this : typ->getChild1();
 }
 
 ::Type *Type_Undefined::getChild2()
 {
-  return t == nullptr ? nullptr : t->getChild2();
+  return typ == nullptr ? nullptr : typ->getChild2();
 }
 
 long unsigned int Type_Undefined::getDimensions()
 {
-  return t == nullptr ? 0 : t->getDimensions();
+  return typ == nullptr ? 0 : typ->getDimensions();
 }
 
 std::string Type_Undefined::get_id()
 {
-  return t == nullptr ? "" : t->get_id();
+  return typ == nullptr ? "" : typ->get_id();
 }
 
 bool Type_Undefined::equals(::Type *other)
@@ -230,21 +230,21 @@ bool Type_Undefined::equals(::Type *other)
     other = other->getChild1();
   if (this == other)
     return 1;
-  if (t == nullptr)
+  if (typ == nullptr)
   {
-    t = other;
+    typ = other;
     // std::cerr << *this << std::endl;
     return 1;
   }
   else
-    return t->equals(other);
+    return typ->equals(other);
 }
 
 // class Expr
 
 void Expr::type_check(::Type *t)
 {
-  if (!t->equals(this->t))
+  if (!t->equals(this->typ))
   {
     std::cerr << *this;
     semanticError("Type mismatch");
@@ -253,45 +253,45 @@ void Expr::type_check(::Type *t)
 
 // class Int_Expr
 
-void Int_Expr::sem() { t = new Type_Int(); }
+void Int_Expr::sem() { typ = new Type_Int(); }
 
 // class Float_Expr
 
-void Float_Expr::sem() { t = new Type_Float(); }
+void Float_Expr::sem() { typ = new Type_Float(); }
 
 // class Char_Expr
 
-void Char_Expr::sem() { t = new Type_Char(); }
+void Char_Expr::sem() { typ = new Type_Char(); }
 
 // class Str_Expr
 
 void Str_Expr::sem()
 {
-  t = new Type_Array(1, new Type_Char());
+  typ = new Type_Array(1, new Type_Char());
 }
 
 // class Bool_Expr
 
-void Bool_Expr::sem() { t = new Type_Bool(); }
+void Bool_Expr::sem() { typ = new Type_Bool(); }
 
 // class Unit_Expr
 
-void Unit_Expr::sem() { t = new Type_Unit(); }
+void Unit_Expr::sem() { typ = new Type_Unit(); }
 
 // class Array
 
 void Array::sem()
 {
   SymbolEntry *se = st.lookup(id);
-  t = se->type;
-  if (!t->equals(new Type_Array(expr_vec->size(), new Type_Undefined())))
+  typ = se->type;
+  if (!typ->equals(new Type_Array(expr_vec->size(), new Type_Undefined())))
     semanticError("Array: Type mismatch");
   for (Expr *e : *expr_vec)
   {
     e->sem();
     e->type_check(new Type_Int());
   }
-  t = new Type_Ref(t->getChild1());
+  typ = new Type_Ref(typ->getChild1());
 }
 
 // class Dim
@@ -306,16 +306,16 @@ void Dim::sem()
     else if (ind < 1 || ind > se->type->getDimensions())
       semanticError("Array dimensions mismatch");
   }
-  t = new Type_Int();
+  typ = new Type_Int();
 }
 
 // class id
 
-void id_Expr::sem() { t = st.lookup(id)->type; }
+void id_Expr::sem() { typ = st.lookup(id)->type; }
 
 // class Id
 
-void Id_Expr::sem() { t = st.lookup(id)->type; }
+void Id_Expr::sem() { typ = st.lookup(id)->type; }
 
 // class While
 
@@ -324,7 +324,7 @@ void While::sem()
   cond->sem();
   cond->type_check(new Type_Bool());
   stmt->sem();
-  t = new Type_Unit();
+  typ = new Type_Unit();
 }
 
 // class For
@@ -339,7 +339,7 @@ void For::sem()
   st.insert(id, new Type_Int());
   do_stmt->sem();
   st.closeScope();
-  t = new Type_Unit();
+  typ = new Type_Unit();
 }
 
 // class call
@@ -364,43 +364,43 @@ void call::sem()
   {
     semanticError("Parameter number mismatch");
   }
-  t = tmp;
+  typ = tmp;
 }
 
 // class UnOp
 
 void UnOp::sem()
 {
-  e->sem();
+  expr->sem();
   switch (op)
   {
   case unop_plus:
   case unop_minus:
-    e->type_check(new Type_Int());
-    t = new Type_Int();
+    expr->type_check(new Type_Int());
+    typ = new Type_Int();
     break;
   case unop_float_plus:
   case unop_float_minus:
-    e->type_check(new Type_Float());
-    t = new Type_Float();
+    expr->type_check(new Type_Float());
+    typ = new Type_Float();
     break;
   case unop_exclamation:
-    if (e->t->get_type() == type_undefined)
-      e->type_check(new Type_Ref(new Type_Undefined()));
-    else if (e->t->get_type() != type_ref)
+    if (expr->typ->get_type() == type_undefined)
+      expr->type_check(new Type_Ref(new Type_Undefined()));
+    else if (expr->typ->get_type() != type_ref)
       semanticError("exclamation: Type mismatch");
-    t = e->t->getChild1();
+    typ = expr->typ->getChild1();
     break;
   case unop_not:
-    e->type_check(new Type_Bool());
-    t = new Type_Bool();
+    expr->type_check(new Type_Bool());
+    typ = new Type_Bool();
     break;
   case unop_delete:
-    if (e->t->get_type() == type_undefined)
-      e->type_check(new Type_Ref(new Type_Undefined()));
-    else if (e->t->get_type() != type_ref)
+    if (expr->typ->get_type() == type_undefined)
+      expr->type_check(new Type_Ref(new Type_Undefined()));
+    else if (expr->typ->get_type() != type_ref)
       semanticError("delete: Type mismatch");
-    t = new Type_Unit();
+    typ = new Type_Unit();
     break;
   default:
     semanticError("Unary operator not allowed for expression");
@@ -423,7 +423,7 @@ void BinOp::sem()
   case binop_mod:
     left->type_check(new Type_Int);
     right->type_check(new Type_Int);
-    t = new Type_Int();
+    typ = new Type_Int();
     break;
   case binop_float_plus:
   case binop_float_minus:
@@ -432,14 +432,14 @@ void BinOp::sem()
   case binop_pow:
     left->type_check(new Type_Float);
     right->type_check(new Type_Float);
-    t = new Type_Float();
+    typ = new Type_Float();
     break;
   case binop_single_eq:
   case binop_struct_diff:
   case binop_double_eq:
   case binop_diff:
-    left->type_check(right->t);
-    switch (left->t->get_type())
+    left->type_check(right->typ);
+    switch (left->typ->get_type())
     {
     case type_array:
     case type_func:
@@ -448,14 +448,14 @@ void BinOp::sem()
     default:
       break;
     }
-    t = new Type_Bool();
+    typ = new Type_Bool();
     break;
   case binop_l:
   case binop_g:
   case binop_leq:
   case binop_geq:
-    left->type_check(right->t);
-    switch (left->t->get_type())
+    left->type_check(right->typ);
+    switch (left->typ->get_type())
     {
     case type_int:
     case type_float:
@@ -466,20 +466,20 @@ void BinOp::sem()
       semanticError("Type not allowed");
       break;
     }
-    t = new Type_Bool();
+    typ = new Type_Bool();
     break;
   case binop_and:
   case binop_or:
     left->type_check(new Type_Bool);
     right->type_check(new Type_Bool);
-    t = new Type_Bool();
+    typ = new Type_Bool();
     break;
   case binop_assign:
-    left->type_check(new Type_Ref(right->t));
-    t = new Type_Unit();
+    left->type_check(new Type_Ref(right->typ));
+    typ = new Type_Unit();
     break;
   case binop_semicolon:
-    t = right->t;
+    typ = right->typ;
     break;
   }
 }
@@ -494,9 +494,9 @@ void If::sem()
   if (expr3 != nullptr)
   {
     expr3->sem();
-    expr2->type_check(expr3->t);
+    expr2->type_check(expr3->typ);
   }
-  t = expr2->t;
+  typ = expr2->typ;
 }
 
 // class New
@@ -506,50 +506,50 @@ void New::sem()
   if (typ->get_type() == type_array)
     semanticError("Reference cannot be of Type array");
   typ->sem();
-  t = new Type_Ref(typ);
+  typ = new Type_Ref(typ);
 }
 
 // class Pattern_Int_Expr
 
 void Pattern_Int_Expr::sem()
 {
-  t = new Type_Int();
+  typ = new Type_Int();
 }
 
 // class Pattern_Float_Expr
 
 void Pattern_Float_Expr::sem()
 {
-  t = new Type_Float();
+  typ = new Type_Float();
 }
 
 // class Pattern_Char_Expr
 
 void Pattern_Char_Expr::sem()
 {
-  t = new Type_Char();
+  typ = new Type_Char();
 }
 
 // class Pattern_Bool_Expr
 
 void Pattern_Bool_Expr::sem()
 {
-  t = new Type_Bool();
+  typ = new Type_Bool();
 }
 
 // class Pattern_id
 
 void Pattern_id::sem()
 {
-  t = new Type_Undefined();
-  st.insert(id, t);
+  typ = new Type_Undefined();
+  st.insert(id, typ);
 }
 
 // class Pattern_Id
 
 void Pattern_Id::sem()
 {
-  t = st.lookup(id)->type;
+  typ = st.lookup(id)->type;
 }
 
 // class Pattern_Call
@@ -566,7 +566,7 @@ void Pattern_Call::sem()
     }
     else
     {
-      if (!p->t->equals(tmp->getChild1()))
+      if (!p->typ->equals(tmp->getChild1()))
         semanticError("Type mismatch");
       tmp = tmp->getChild2();
     }
@@ -575,7 +575,7 @@ void Pattern_Call::sem()
   {
     semanticError("Parameter number mismatch");
   }
-  t = tmp;
+  typ = tmp;
 }
 
 // class Clause
@@ -584,18 +584,18 @@ void Pattern_Call::sem()
 
 void Match::sem()
 {
-  e->sem();
+  expr->sem();
   ::Type *typ = new Type_Undefined();
   st.openScope();
   for (Clause *cl : *vec)
   {
-    cl->p->sem();
-    e->type_check(cl->p->t);
-    cl->e->sem();
-    cl->e->type_check(typ);
+    cl->par->sem();
+    expr->type_check(cl->par->typ);
+    cl->expr->sem();
+    cl->expr->type_check(typ);
   }
   st.closeScope();
-  t = ((*vec)[0])->e->t;
+  typ = ((*vec)[0])->expr->typ;
 }
 
 // class Constr
@@ -612,8 +612,8 @@ void Constr::sem(std::string id)
 
 void Par::sem()
 {
-  t->sem();
-  st.insert(id, t);
+  typ->sem();
+  st.insert(id, typ);
 }
 
 // class TDef
@@ -667,10 +667,12 @@ void MutableDef::sem()
 void NormalDef::sem()
 {
   typ->sem();
+  if(typ->get_type() == type_func)
+    semanticError("Return type function not allowed");
   ::Type *tmp = typ;
   for (auto i = par_vec->rbegin(); i != par_vec->rend(); i++)
   {
-    tmp = new Type_Func((*i)->t, tmp);
+    tmp = new Type_Func((*i)->typ, tmp);
   }
   st.insert(id, tmp);
 }
@@ -722,6 +724,6 @@ void LetIn::sem()
   st.openScope();
   def->sem();
   expr->sem();
-  t = expr->t;
+  typ = expr->typ;
   st.closeScope();
 }

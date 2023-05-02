@@ -143,11 +143,27 @@ Value *NormalDef::compile() const
     {
       llvm::Type *t = typ->compile();
       llvm::GlobalVariable *globalVar = new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), id);
-      Builder.CreateCall(TheWriteChar, std::vector<Value *>{nullptr});
       Builder.CreateStore(v, globalVar);
     }
   }
-
+  else // function
+  {
+    std::vector<llvm::Type *> from;
+    for (Par *par : *par_vec)
+    {
+      ::Type *t = par->typ;
+      if (t->get_type() != type_unit)
+        from.push_back(t->compile());
+    }
+    llvm::Type *to = typ->compile();
+    FunctionType *ft = FunctionType::get(to, from, false);
+    Function *f = Function::Create(ft, Function::ExternalLinkage, id, TheModule.get());
+    BasicBlock *PrevBB = Builder.GetInsertBlock();
+    BasicBlock *BodyBB = BasicBlock::Create(TheContext, id, f);
+    Builder.SetInsertPoint(BodyBB);
+    Builder.CreateRet(expr->compile());
+    Builder.SetInsertPoint(PrevBB);
+  }
   return nullptr;
 }
 
@@ -158,8 +174,12 @@ Value *call::compile() const
   {
     value_vec.push_back(expr->compile());
   }
-  Value *ret = Builder.CreateCall(TheModule->getFunction(id), value_vec);
-  return ret;
+  if (typ->get_type() == type_unit)
+  {
+    Builder.CreateCall(TheModule->getFunction(id), value_vec);
+    return nullptr;
+  }
+  return Builder.CreateCall(TheModule->getFunction(id), value_vec, "calltmp");
 }
 
 Value *Int_Expr::compile() const
@@ -174,7 +194,7 @@ Value *Float_Expr::compile() const
 
 Value *Char_Expr::compile() const
 {
-  return c8(chr);
+  return c8(ch);
 }
 
 Value *Str_Expr::compile() const
@@ -185,7 +205,7 @@ Value *Str_Expr::compile() const
 
 Value *Bool_Expr::compile() const
 {
-  return c8(var);
+  return c8(boolean);
 }
 
 Value *id_Expr::compile() const
