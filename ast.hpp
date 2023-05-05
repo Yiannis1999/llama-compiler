@@ -806,8 +806,6 @@ public:
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   ::Type *typ;
-
-private:
   std::string id;
 };
 

@@ -78,15 +78,15 @@ void Program::llvm_compile_and_dump(bool optimize = false)
 
   // Initialize Read Library Functions
   FunctionType *ReadInteger_type = FunctionType::get(i64, {}, false);
-  TheReadInteger = Function::Create(ReadInteger_type, Function::ExternalLinkage, "readInteger", TheModule.get());
+  TheReadInteger = Function::Create(ReadInteger_type, Function::ExternalLinkage, str_read_int, TheModule.get());
   FunctionType *ReadBoolean_type = FunctionType::get(i8, {}, false);
-  TheReadBoolean = Function::Create(ReadBoolean_type, Function::ExternalLinkage, "readBoolean", TheModule.get());
+  TheReadBoolean = Function::Create(ReadBoolean_type, Function::ExternalLinkage, str_read_bool, TheModule.get());
   FunctionType *ReadChar_type = FunctionType::get(i8, {}, false);
-  TheReadChar = Function::Create(ReadChar_type, Function::ExternalLinkage, "readChar", TheModule.get());
+  TheReadChar = Function::Create(ReadChar_type, Function::ExternalLinkage, str_read_char, TheModule.get());
   FunctionType *ReadReal_type = FunctionType::get(flo, {}, false);
-  TheReadReal = Function::Create(ReadReal_type, Function::ExternalLinkage, "readReal", TheModule.get());
+  TheReadReal = Function::Create(ReadReal_type, Function::ExternalLinkage, str_read_float, TheModule.get());
   FunctionType *ReadString_type = FunctionType::get(PointerType::get(PointerType::get(i8, 0), 0), {}, false);
-  TheReadString = Function::Create(ReadString_type, Function::ExternalLinkage, "readString", TheModule.get());
+  TheReadString = Function::Create(ReadString_type, Function::ExternalLinkage, str_read_string, TheModule.get());
 
   // Initialize Math Functions
 
@@ -117,7 +117,6 @@ void Program::llvm_compile_and_dump(bool optimize = false)
 
 Value *Program::compile() const
 {
-  // Compile each statement
   for (Stmt *stmt : *statements)
   {
     stmt->compile();
@@ -151,13 +150,32 @@ Value *NormalDef::compile() const
     std::vector<llvm::Type *> from;
     for (Par *par : *par_vec)
     {
-      ::Type *t = par->typ;
-      if (t->get_type() != type_unit)
-        from.push_back(t->compile());
+      llvm::Type *t = par->typ->compile();
+      switch (par->typ->get_type())
+      {
+      case type_unit:
+        break;
+      default:
+        from.push_back(t);
+        break;
+      }
     }
     llvm::Type *to = typ->compile();
     FunctionType *ft = FunctionType::get(to, from, false);
     Function *f = Function::Create(ft, Function::ExternalLinkage, id, TheModule.get());
+    llvm::Function::arg_iterator arg = f->arg_begin();
+    for (Par *par : *par_vec)
+    {
+      switch (par->typ->get_type())
+      {
+      case type_unit:
+        break;
+      default:
+        arg->setName(par->id);
+        std::advance(arg, 1);
+        break;
+      }
+    }
     BasicBlock *PrevBB = Builder.GetInsertBlock();
     BasicBlock *BodyBB = BasicBlock::Create(TheContext, id, f);
     Builder.SetInsertPoint(BodyBB);
@@ -172,7 +190,8 @@ Value *call::compile() const
   std::vector<Value *> value_vec;
   for (Expr *expr : *expr_vec)
   {
-    value_vec.push_back(expr->compile());
+    if (expr->typ->get_type() != type_unit)
+      value_vec.push_back(expr->compile());
   }
   if (typ->get_type() == type_unit)
   {
@@ -210,8 +229,18 @@ Value *Bool_Expr::compile() const
 
 Value *id_Expr::compile() const
 {
+  // constant or variable
   llvm::GlobalVariable *var = TheModule->getGlobalVariable(id, true);
-  if (var == nullptr)
-    return nullptr;
-  return Builder.CreateLoad(var, id);
+  if (var != nullptr)
+    return Builder.CreateLoad(var, id);
+  // argument
+  Function *f = Builder.GetInsertBlock()->getParent();
+  for (Function::arg_iterator arg = f->arg_begin(); arg != f->arg_end(); arg++)
+  {
+    if (arg->getName() == id)
+    {
+      return Builder.CreateGEP(arg, {c64(0)}, id);
+    }
+  }
+  return nullptr;
 }
