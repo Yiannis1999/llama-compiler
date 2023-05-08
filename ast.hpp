@@ -268,7 +268,7 @@ public:
   virtual ::Type *getChild2() override;
   virtual bool equals(::Type *other) override;
   virtual void sem() override;
-  virtual llvm::Type *compile() const override { return to->compile(); };
+  virtual llvm::Type *compile() const override;
 
 private:
   ::Type *from, *to;

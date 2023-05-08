@@ -124,6 +124,32 @@ Value *Program::compile() const
   return nullptr;
 }
 
+llvm::Type *Type_Func::compile() const
+{
+  std::vector<::Type *> tmp_vec = {from};
+  std::vector<llvm::Type *> from_vec = {};
+  ::Type *tmp = to;
+  while (tmp->get_type() == type_func)
+  {
+    tmp_vec.push_back(tmp->getChild1());
+    tmp = tmp->getChild2();
+  }
+  for (::Type *t : tmp_vec)
+  {
+    switch (t->get_type())
+    {
+    case type_unit:
+      break;
+    default:
+      from_vec.push_back(t->compile());
+      break;
+    }
+  }
+  FunctionType *fn_type = FunctionType::get(tmp->compile(), from_vec, false);
+  PointerType *fn_ptr_type = PointerType::getUnqual(fn_type);
+  return fn_ptr_type;
+}
+
 Value *LetDef::compile() const
 {
   for (Def *def : *def_vec)
@@ -141,13 +167,13 @@ Value *NormalDef::compile() const
     if (typ->get_type() != type_unit)
     {
       llvm::Type *t = typ->compile();
-      llvm::GlobalVariable *globalVar = new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), id);
+      GlobalVariable *globalVar = new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), id);
       Builder.CreateStore(v, globalVar);
     }
   }
   else // function
   {
-    std::vector<llvm::Type *> from;
+    std::vector<llvm::Type *> from = {};
     for (Par *par : *par_vec)
     {
       llvm::Type *t = par->typ->compile();
@@ -161,9 +187,9 @@ Value *NormalDef::compile() const
       }
     }
     llvm::Type *to = typ->compile();
-    FunctionType *ft = FunctionType::get(to, from, false);
-    Function *f = Function::Create(ft, Function::ExternalLinkage, id, TheModule.get());
-    llvm::Function::arg_iterator arg = f->arg_begin();
+    FunctionType *fn_type = FunctionType::get(to, from, false);
+    Function *func = Function::Create(fn_type, Function::ExternalLinkage, id, TheModule.get());
+    Function::arg_iterator arg = func->arg_begin();
     for (Par *par : *par_vec)
     {
       switch (par->typ->get_type())
@@ -177,7 +203,7 @@ Value *NormalDef::compile() const
       }
     }
     BasicBlock *PrevBB = Builder.GetInsertBlock();
-    BasicBlock *BodyBB = BasicBlock::Create(TheContext, id, f);
+    BasicBlock *BodyBB = BasicBlock::Create(TheContext, id, func);
     Builder.SetInsertPoint(BodyBB);
     Builder.CreateRet(expr->compile());
     Builder.SetInsertPoint(PrevBB);
@@ -193,12 +219,32 @@ Value *call::compile() const
     if (expr->typ->get_type() != type_unit)
       value_vec.push_back(expr->compile());
   }
+  Function *func = TheModule->getFunction(id);
+  if (func == nullptr) // argument
+  {
+    Function *f = Builder.GetInsertBlock()->getParent();
+    for (Function::arg_iterator arg = f->arg_begin(); arg != f->arg_end(); arg++)
+    {
+      if (arg->getName() == id)
+      {
+        Value *fptr = arg;
+        PointerType *fn_ptr_type = dyn_cast<PointerType>(arg->getType());
+        FunctionType *fn_type = dyn_cast<FunctionType>(fn_ptr_type->getElementType());
+        if (typ->get_type() == type_unit)
+        {
+          Builder.CreateCall(fn_type, fptr, value_vec);
+          return nullptr;
+        }
+        return Builder.CreateCall(fn_type, fptr, value_vec, "calltmp");
+      }
+    }
+  }
   if (typ->get_type() == type_unit)
   {
-    Builder.CreateCall(TheModule->getFunction(id), value_vec);
+    Builder.CreateCall(func, value_vec);
     return nullptr;
   }
-  return Builder.CreateCall(TheModule->getFunction(id), value_vec, "calltmp");
+  return Builder.CreateCall(func, value_vec, "calltmp");
 }
 
 Value *Int_Expr::compile() const
@@ -230,17 +276,22 @@ Value *Bool_Expr::compile() const
 Value *id_Expr::compile() const
 {
   // constant or variable
-  llvm::GlobalVariable *var = TheModule->getGlobalVariable(id, true);
+  GlobalVariable *var = TheModule->getGlobalVariable(id, true);
   if (var != nullptr)
     return Builder.CreateLoad(var, id);
+  // function
+  Function *func = TheModule->getFunction(id);
+  if (func != nullptr)
+  {
+    FunctionType *fn_type = func->getFunctionType();
+    PointerType *fn_ptr_type = PointerType::getUnqual(fn_type);
+    Value *fptr = ConstantExpr::getBitCast(func, fn_ptr_type);
+    return fptr;
+  }
   // argument
   Function *f = Builder.GetInsertBlock()->getParent();
   for (Function::arg_iterator arg = f->arg_begin(); arg != f->arg_end(); arg++)
-  {
     if (arg->getName() == id)
-    {
-      return Builder.CreateGEP(arg, {c64(0)}, id);
-    }
-  }
+      return arg;
   return nullptr;
 }

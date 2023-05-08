@@ -350,6 +350,10 @@ void call::sem()
   for (Expr *e : *expr_vec)
   {
     e->sem();
+    if (tmp->get_type() == type_undefined)
+    {
+      tmp->equals(new Type_Func(new Type_Undefined(), new Type_Undefined()));
+    }
     if (tmp->get_type() != type_func)
     {
       semanticError("Parameter number mismatch");
@@ -560,6 +564,10 @@ void Pattern_Call::sem()
   for (Pattern *p : *pattern_vec)
   {
     p->sem();
+    if (tmp->get_type() == type_undefined)
+    {
+      tmp->equals(new Type_Func(new Type_Undefined(), new Type_Undefined()));
+    }
     if (tmp->get_type() != type_func)
     {
       semanticError("Parameter number mismatch");
@@ -667,7 +675,7 @@ void MutableDef::sem()
 void NormalDef::sem()
 {
   typ->sem();
-  if(typ->get_type() == type_func)
+  if (typ->get_type() == type_func)
     semanticError("Return type function not allowed");
   ::Type *tmp = typ;
   for (auto i = par_vec->rbegin(); i != par_vec->rend(); i++)
