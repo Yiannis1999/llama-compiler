@@ -379,3 +379,37 @@ Value *BinOp::compile() const
   }
   return nullptr;
 }
+
+Value *If::compile() const
+{
+  Value *v = expr1->compile();
+  Value *cond = Builder.CreateICmpEQ(v, c1(true), "if_cond");
+  Function *TheFunction = Builder.GetInsertBlock()->getParent();
+  BasicBlock *ThenBB = BasicBlock::Create(TheContext, "then", TheFunction);
+  BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else", TheFunction);
+  BasicBlock *AfterBB = BasicBlock::Create(TheContext, "endif", TheFunction);
+  Builder.CreateCondBr(cond, ThenBB, ElseBB);
+  Builder.SetInsertPoint(ThenBB);
+  Value *v2 = expr2->compile();
+  ThenBB = Builder.GetInsertBlock();
+  Builder.CreateBr(AfterBB);
+  Builder.SetInsertPoint(ElseBB);
+  Value *v3 = nullptr;
+  if (expr3 != nullptr)
+    v3 = expr3->compile();
+  ElseBB = Builder.GetInsertBlock();
+  Builder.CreateBr(AfterBB);
+  Builder.SetInsertPoint(AfterBB);
+  if (typ->get_type() == type_unit)
+    return nullptr;
+  PHINode *ret = Builder.CreatePHI(typ->compile(), 2, "ret");
+  ret->addIncoming(v2, ThenBB);
+  ret->addIncoming(v3, ElseBB);
+  return ret;
+}
+
+Value *LetIn::compile() const
+{
+  def->compile();
+  return expr->compile();
+}

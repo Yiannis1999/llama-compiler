@@ -495,7 +495,11 @@ void If::sem()
   expr1->sem();
   expr1->type_check(new Type_Bool());
   expr2->sem();
-  if (expr3 != nullptr)
+  if (expr3 == nullptr)
+  {
+    expr2->type_check(new Type_Unit());
+  }
+  else
   {
     expr3->sem();
     expr2->type_check(expr3->typ);

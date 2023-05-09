@@ -152,6 +152,10 @@ protected:
   static llvm::Type *voi;
 
   // LLVM helper functions
+  static ConstantInt *c1(bool b)
+  {
+    return ConstantInt::get(TheContext, APInt(1, b, true));
+  }
   static ConstantInt *c8(char c)
   {
     return ConstantInt::get(TheContext, APInt(8, c, true));
@@ -628,6 +632,7 @@ public:
   If(Expr *e1, Expr *e2, Expr *e3) : expr1(e1), expr2(e2), expr3(e3) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile() const override;
 
 private:
   Expr *expr1, *expr2, *expr3;
@@ -895,6 +900,7 @@ public:
   LetIn(LetDef *d, Expr *e) : def(d), expr(e) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile() const override;
 
 private:
   LetDef *def;
