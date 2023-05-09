@@ -41,14 +41,14 @@ typedef enum
   binop_float_div,
   binop_mod,
   binop_pow,
-  binop_single_eq,
+  binop_struct_eq,
   binop_struct_diff,
   binop_l,
   binop_g,
   binop_leq,
   binop_geq,
-  binop_double_eq,
-  binop_diff,
+  binop_logic_eq,
+  binop_logic_diff,
   binop_and,
   binop_or,
   binop_semicolon,
@@ -144,6 +144,7 @@ protected:
   static Function *pi;
 
   // Type Shortcuts
+  static llvm::Type *i1;
   static llvm::Type *i8;
   static llvm::Type *i32;
   static llvm::Type *i64;
@@ -255,7 +256,7 @@ public:
   Type_Bool() {}
   virtual void printOn(std::ostream &out) const override;
   virtual main_type get_type() override;
-  virtual llvm::Type *compile() const override { return i8; };
+  virtual llvm::Type *compile() const override { return i1; };
 };
 
 class Type_Func : public ::Type
@@ -613,6 +614,7 @@ public:
   BinOp(Expr *e1, binop_enum op1, Expr *e2) : left(e1), op(op1), right(e2) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile() const override;
 
 private:
   Expr *left;
@@ -838,6 +840,7 @@ class Def : public AST
 public:
   virtual void sem2(){};
   virtual Value *compile() const { return nullptr; }
+  virtual Value *compile2() const { return nullptr; }
 };
 
 class MutableDef : public Def
@@ -864,6 +867,7 @@ public:
   virtual void sem2() override;
   virtual void printOn(std::ostream &out) const override;
   virtual Value *compile() const override;
+  virtual Value *compile2() const override;
 
 private:
   std::string id;

@@ -438,10 +438,10 @@ void BinOp::sem()
     right->type_check(new Type_Float);
     typ = new Type_Float();
     break;
-  case binop_single_eq:
+  case binop_struct_eq:
   case binop_struct_diff:
-  case binop_double_eq:
-  case binop_diff:
+  case binop_logic_eq:
+  case binop_logic_diff:
     left->type_check(right->typ);
     switch (left->typ->get_type())
     {

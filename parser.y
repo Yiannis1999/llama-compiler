@@ -295,14 +295,14 @@ expr4:
 | expr4 T_div_op expr4 { $$ = new BinOp($1, binop_float_div , $3); }
 | expr4 T_mod expr4 { $$ = new BinOp($1, binop_mod , $3); }
 | expr4 T_pow_op expr4 { $$ = new BinOp($1, binop_pow , $3); }
-| expr4 '=' expr4 { $$ = new BinOp($1, binop_single_eq , $3); }
+| expr4 '=' expr4 { $$ = new BinOp($1, binop_struct_eq , $3); }
 | expr4 T_struct_diff_op expr4 { $$ = new BinOp($1, binop_struct_diff , $3); }
 | expr4 '<' expr4 { $$ = new BinOp($1, binop_l , $3); }
 | expr4 '>' expr4 { $$ = new BinOp($1, binop_g , $3); }
 | expr4 T_leq_op expr4 { $$ = new BinOp($1, binop_leq , $3); }
 | expr4 T_geq_op expr4 { $$ = new BinOp($1, binop_geq , $3); }
-| expr4 T_eq_op expr4 { $$ = new BinOp($1, binop_double_eq , $3); } 
-| expr4 T_diff_op expr4 { $$ = new BinOp($1, binop_diff , $3); }
+| expr4 T_eq_op expr4 { $$ = new BinOp($1, binop_logic_eq , $3); } 
+| expr4 T_diff_op expr4 { $$ = new BinOp($1, binop_logic_diff , $3); }
 | expr4 T_and_op expr4 { $$ = new BinOp($1, binop_and , $3); }
 | expr4 T_or_op expr4 { $$ = new BinOp($1, binop_or , $3); }
 | expr4 T_assign_op expr4 { $$ = new BinOp($1, binop_assign , $3); }

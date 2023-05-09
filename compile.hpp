@@ -36,6 +36,7 @@ Function *AST::ln;
 Function *AST::pi;
 
 // Type Declarations
+llvm::Type *AST::i1;
 llvm::Type *AST::i8;
 llvm::Type *AST::i32;
 llvm::Type *AST::i64;
@@ -58,6 +59,7 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   TheFPM->doInitialization();
 
   // Initialize types
+  i1 = IntegerType::get(TheContext, 1);
   i8 = IntegerType::get(TheContext, 8);
   i32 = IntegerType::get(TheContext, 32);
   i64 = IntegerType::get(TheContext, 64);
@@ -67,7 +69,7 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   // Initialize Write Library Functions
   FunctionType *writeInteger_type = FunctionType::get(voi, {i64}, false);
   TheWriteInteger = Function::Create(writeInteger_type, Function::ExternalLinkage, str_print_int, TheModule.get());
-  FunctionType *writeBoolean_type = FunctionType::get(voi, {i8}, false);
+  FunctionType *writeBoolean_type = FunctionType::get(voi, {i1}, false);
   TheWriteBoolean = Function::Create(writeBoolean_type, Function::ExternalLinkage, str_print_bool, TheModule.get());
   FunctionType *writeChar_type = FunctionType::get(voi, {i8}, false);
   TheWriteChar = Function::Create(writeChar_type, Function::ExternalLinkage, str_print_char, TheModule.get());
@@ -79,7 +81,7 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   // Initialize Read Library Functions
   FunctionType *ReadInteger_type = FunctionType::get(i64, {}, false);
   TheReadInteger = Function::Create(ReadInteger_type, Function::ExternalLinkage, str_read_int, TheModule.get());
-  FunctionType *ReadBoolean_type = FunctionType::get(i8, {}, false);
+  FunctionType *ReadBoolean_type = FunctionType::get(i1, {}, false);
   TheReadBoolean = Function::Create(ReadBoolean_type, Function::ExternalLinkage, str_read_bool, TheModule.get());
   FunctionType *ReadChar_type = FunctionType::get(i8, {}, false);
   TheReadChar = Function::Create(ReadChar_type, Function::ExternalLinkage, str_read_char, TheModule.get());
@@ -156,19 +158,21 @@ Value *LetDef::compile() const
   {
     def->compile();
   }
+  for (Def *def : *def_vec)
+  {
+    def->compile2();
+  }
   return nullptr;
 }
 
 Value *NormalDef::compile() const
 {
-  if (par_vec->size() == 0) // variable
+  if (par_vec->size() == 0) // constant
   {
-    Value *v = expr->compile();
     if (typ->get_type() != type_unit)
     {
       llvm::Type *t = typ->compile();
-      GlobalVariable *globalVar = new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), id);
-      Builder.CreateStore(v, globalVar);
+      new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), id);
     }
   }
   else // function
@@ -202,6 +206,24 @@ Value *NormalDef::compile() const
         break;
       }
     }
+  }
+  return nullptr;
+}
+
+Value *NormalDef::compile2() const
+{
+  if (par_vec->size() == 0) // constant
+  {
+    Value *val = expr->compile();
+    if (typ->get_type() != type_unit)
+    {
+      GlobalVariable *globalVar = TheModule->getGlobalVariable(id, true);
+      Builder.CreateStore(val, globalVar);
+    }
+  }
+  else // function
+  {
+    Function *func = TheModule->getFunction(id);
     BasicBlock *PrevBB = Builder.GetInsertBlock();
     BasicBlock *BodyBB = BasicBlock::Create(TheContext, id, func);
     Builder.SetInsertPoint(BodyBB);
@@ -293,5 +315,67 @@ Value *id_Expr::compile() const
   for (Function::arg_iterator arg = f->arg_begin(); arg != f->arg_end(); arg++)
     if (arg->getName() == id)
       return arg;
+  return nullptr;
+}
+
+Value *BinOp::compile() const
+{
+  llvm::Value *l = left->compile();
+  llvm::Value *r = right->compile();
+  switch (op)
+  {
+  case binop_plus:
+    return Builder.CreateAdd(l, r, "addtmp");
+  case binop_minus:
+    return Builder.CreateSub(l, r, "subtmp");
+  case binop_mult:
+    return Builder.CreateMul(l, r, "multmp");
+  case binop_div:
+    return Builder.CreateSDiv(l, r, "divtmp");
+  case binop_mod:
+    return Builder.CreateSRem(l, r, "modtmp");
+  case binop_float_plus:
+    return Builder.CreateFAdd(l, r, "faddtmp");
+  case binop_float_minus:
+    return Builder.CreateFSub(l, r, "fsubtmp");
+  case binop_float_mult:
+    return Builder.CreateFMul(l, r, "fmultmp");
+  case binop_float_div:
+    return Builder.CreateFDiv(l, r, "fdivtmp");
+  case binop_pow:
+    // return Builder.CreateCall(powFunction, { l, r }, "fpowtmp");
+  case binop_struct_eq:
+    if (l->getType()->isFloatingPointTy())
+      return Builder.CreateFCmpOEQ(l, r, "eqtmp");
+    return Builder.CreateICmpEQ(l, r, "eqtmp");
+  case binop_struct_diff:
+    if (l->getType()->isFloatingPointTy())
+      return Builder.CreateFCmpONE(l, r, "eqtmp");
+    return Builder.CreateICmpNE(l, r, "eqtmp");
+  case binop_logic_eq:
+  case binop_logic_diff:
+  case binop_l:
+    if (l->getType()->isFloatingPointTy())
+      return Builder.CreateFCmpOLT(l, r, "eqtmp");
+    return Builder.CreateICmpSLT(l, r, "eqtmp");
+  case binop_g:
+    if (l->getType()->isFloatingPointTy())
+      return Builder.CreateFCmpOGT(l, r, "eqtmp");
+    return Builder.CreateICmpSGT(l, r, "eqtmp");
+  case binop_leq:
+    if (l->getType()->isFloatingPointTy())
+      return Builder.CreateFCmpOLE(l, r, "eqtmp");
+    return Builder.CreateICmpSLE(l, r, "eqtmp");
+  case binop_geq:
+    if (l->getType()->isFloatingPointTy())
+      return Builder.CreateFCmpOGE(l, r, "eqtmp");
+    return Builder.CreateICmpSGE(l, r, "eqtmp");
+  case binop_and:
+  case binop_or:
+  case binop_assign:
+    return Builder.CreateStore(l, r);
+  case binop_semicolon:
+    return r;
+  }
   return nullptr;
 }
