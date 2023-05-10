@@ -84,9 +84,32 @@ void Program::sem()
   st.insert(str_print_float, new Type_Func(new Type_Float(), new Type_Unit()));
   st.insert(str_print_string, new Type_Func(new Type_Array(1, new Type_Char()), new Type_Unit()));
   st.insert(str_read_int, new Type_Func(new Type_Unit(), new Type_Int()));
+  st.insert(str_read_bool, new Type_Func(new Type_Unit(), new Type_Bool()));
+  st.insert(str_read_char, new Type_Func(new Type_Unit(), new Type_Char()));
+  st.insert(str_read_float, new Type_Func(new Type_Unit(), new Type_Float()));
+  st.insert(str_read_string, new Type_Func(new Type_Unit(), new Type_Array(1, new Type_Char())));
+  st.insert(str_abs, new Type_Func(new Type_Int(), new Type_Int()));
+  st.insert(str_fabs, new Type_Func(new Type_Float(), new Type_Float()));
+  st.insert(str_sqrt, new Type_Func(new Type_Float(), new Type_Float()));
+  st.insert(str_sin, new Type_Func(new Type_Float(), new Type_Float()));
+  st.insert(str_cos, new Type_Func(new Type_Float(), new Type_Float()));
+  st.insert(str_tan, new Type_Func(new Type_Float(), new Type_Float()));
+  st.insert(str_atan, new Type_Func(new Type_Float(), new Type_Float()));
+  st.insert(str_exp, new Type_Func(new Type_Float(), new Type_Float()));
+  st.insert(str_ln, new Type_Func(new Type_Float(), new Type_Float()));
+  st.insert(str_pi, new Type_Func(new Type_Unit(), new Type_Float()));
   st.insert(str_incr, new Type_Func(new Type_Ref(new Type_Int), new Type_Unit()));
+  st.insert(str_decr, new Type_Func(new Type_Ref(new Type_Int), new Type_Unit()));
   st.insert(str_float_of_int, new Type_Func(new Type_Int(), new Type_Float()));
+  st.insert(str_int_of_float, new Type_Func(new Type_Float(), new Type_Int()));
+  st.insert(str_round, new Type_Func(new Type_Float(), new Type_Int()));
+  st.insert(str_int_of_char, new Type_Func(new Type_Char(), new Type_Int()));
+  st.insert(str_char_of_int, new Type_Func(new Type_Int(), new Type_Char()));
   st.insert(str_strlen, new Type_Func(new Type_Array(1, new Type_Char()), new Type_Int()));
+  st.insert(str_strcmp, new Type_Func(new Type_Array(1, new Type_Char()), new Type_Func(new Type_Array(1, new Type_Char()), new Type_Int())));
+  st.insert(str_strcpy, new Type_Func(new Type_Array(1, new Type_Char()), new Type_Func(new Type_Array(1, new Type_Char()), new Type_Unit())));
+  st.insert(str_strcat, new Type_Func(new Type_Array(1, new Type_Char()), new Type_Func(new Type_Array(1, new Type_Char()), new Type_Unit())));
+
   for (Stmt *stmt : *statements)
   {
     stmt->sem();
@@ -405,9 +428,6 @@ void UnOp::sem()
     else if (expr->typ->get_type() != type_ref)
       semanticError("delete: Type mismatch");
     typ = new Type_Unit();
-    break;
-  default:
-    semanticError("Unary operator not allowed for expression");
     break;
   }
 }

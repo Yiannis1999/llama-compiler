@@ -7,34 +7,6 @@ IRBuilder<> AST::Builder(TheContext);
 std::unique_ptr<Module> AST::TheModule;
 std::unique_ptr<legacy::FunctionPassManager> AST::TheFPM;
 
-GlobalVariable *AST::TheVars;
-GlobalVariable *AST::TheNL;
-
-// Write Functions
-Function *AST::TheWriteBoolean;
-Function *AST::TheWriteInteger;
-Function *AST::TheWriteChar;
-Function *AST::TheWriteString;
-Function *AST::TheWriteReal;
-
-// Read Functions
-Function *AST::TheReadInteger;
-Function *AST::TheReadBoolean;
-Function *AST::TheReadChar;
-Function *AST::TheReadReal;
-Function *AST::TheReadString;
-
-// Math Functions
-Function *AST::abs;
-Function *AST::fabs;
-Function *AST::sqrt;
-Function *AST::cos;
-Function *AST::tan;
-Function *AST::atan;
-Function *AST::exp;
-Function *AST::ln;
-Function *AST::pi;
-
 // Type Declarations
 llvm::Type *AST::i1;
 llvm::Type *AST::i8;
@@ -66,31 +38,79 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   flo = llvm::Type::getFloatTy(TheContext);
   voi = llvm::Type::getVoidTy(TheContext);
 
-  // Initialize Write Library Functions
-  FunctionType *writeInteger_type = FunctionType::get(voi, {i64}, false);
-  TheWriteInteger = Function::Create(writeInteger_type, Function::ExternalLinkage, str_print_int, TheModule.get());
-  FunctionType *writeBoolean_type = FunctionType::get(voi, {i1}, false);
-  TheWriteBoolean = Function::Create(writeBoolean_type, Function::ExternalLinkage, str_print_bool, TheModule.get());
-  FunctionType *writeChar_type = FunctionType::get(voi, {i8}, false);
-  TheWriteChar = Function::Create(writeChar_type, Function::ExternalLinkage, str_print_char, TheModule.get());
-  FunctionType *writeReal_type = FunctionType::get(voi, {flo}, false);
-  TheWriteReal = Function::Create(writeReal_type, Function::ExternalLinkage, str_print_float, TheModule.get());
-  FunctionType *writeString_type = FunctionType::get(voi, {PointerType::get(i8, 0)}, false);
-  TheWriteString = Function::Create(writeString_type, Function::ExternalLinkage, str_print_string, TheModule.get());
+  // Initialize Write Functions
+  FunctionType *print_int_type = FunctionType::get(voi, {i64}, false);
+  Function::Create(print_int_type, Function::ExternalLinkage, str_print_int, TheModule.get());
+  FunctionType *print_bool_type = FunctionType::get(voi, {i1}, false);
+  Function::Create(print_bool_type, Function::ExternalLinkage, str_print_bool, TheModule.get());
+  FunctionType *print_char_type = FunctionType::get(voi, {i8}, false);
+  Function::Create(print_char_type, Function::ExternalLinkage, str_print_char, TheModule.get());
+  FunctionType *print_float_type = FunctionType::get(voi, {flo}, false);
+  Function::Create(print_float_type, Function::ExternalLinkage, str_print_float, TheModule.get());
+  FunctionType *print_string_type = FunctionType::get(voi, {PointerType::get(i8, 0)}, false);
+  Function::Create(print_string_type, Function::ExternalLinkage, str_print_string, TheModule.get());
 
-  // Initialize Read Library Functions
-  FunctionType *ReadInteger_type = FunctionType::get(i64, {}, false);
-  TheReadInteger = Function::Create(ReadInteger_type, Function::ExternalLinkage, str_read_int, TheModule.get());
-  FunctionType *ReadBoolean_type = FunctionType::get(i1, {}, false);
-  TheReadBoolean = Function::Create(ReadBoolean_type, Function::ExternalLinkage, str_read_bool, TheModule.get());
-  FunctionType *ReadChar_type = FunctionType::get(i8, {}, false);
-  TheReadChar = Function::Create(ReadChar_type, Function::ExternalLinkage, str_read_char, TheModule.get());
-  FunctionType *ReadReal_type = FunctionType::get(flo, {}, false);
-  TheReadReal = Function::Create(ReadReal_type, Function::ExternalLinkage, str_read_float, TheModule.get());
-  FunctionType *ReadString_type = FunctionType::get(PointerType::get(PointerType::get(i8, 0), 0), {}, false);
-  TheReadString = Function::Create(ReadString_type, Function::ExternalLinkage, str_read_string, TheModule.get());
+  // Initialize Read Functions
+  FunctionType *read_int_type = FunctionType::get(i64, {}, false);
+  Function::Create(read_int_type, Function::ExternalLinkage, str_read_int, TheModule.get());
+  FunctionType *read_bool_type = FunctionType::get(i1, {}, false);
+  Function::Create(read_bool_type, Function::ExternalLinkage, str_read_bool, TheModule.get());
+  FunctionType *read_char_type = FunctionType::get(i8, {}, false);
+  Function::Create(read_char_type, Function::ExternalLinkage, str_read_char, TheModule.get());
+  FunctionType *read_float_type = FunctionType::get(flo, {}, false);
+  Function::Create(read_float_type, Function::ExternalLinkage, str_read_float, TheModule.get());
+  FunctionType *read_string_type = FunctionType::get(voi, {PointerType::get(i8, 0)}, false);
+  Function::Create(read_string_type, Function::ExternalLinkage, str_read_string, TheModule.get());
 
   // Initialize Math Functions
+  FunctionType *abs_type = FunctionType::get(i64, {i64}, false);
+  Function::Create(abs_type, Function::ExternalLinkage, str_abs, TheModule.get());
+  FunctionType *fabs_type = FunctionType::get(flo, {flo}, false);
+  Function::Create(fabs_type, Function::ExternalLinkage, str_fabs, TheModule.get());
+  FunctionType *sqrt_type = FunctionType::get(flo, {flo}, false);
+  Function::Create(sqrt_type, Function::ExternalLinkage, str_sqrt, TheModule.get());
+  FunctionType *sin_type = FunctionType::get(flo, {flo}, false);
+  Function::Create(sin_type, Function::ExternalLinkage, str_sin, TheModule.get());
+  FunctionType *cos_type = FunctionType::get(flo, {flo}, false);
+  Function::Create(cos_type, Function::ExternalLinkage, str_cos, TheModule.get());
+  FunctionType *tan_type = FunctionType::get(flo, {flo}, false);
+  Function::Create(tan_type, Function::ExternalLinkage, str_tan, TheModule.get());
+  FunctionType *atan_type = FunctionType::get(flo, {flo}, false);
+  Function::Create(atan_type, Function::ExternalLinkage, str_atan, TheModule.get());
+  FunctionType *exp_type = FunctionType::get(flo, {flo}, false);
+  Function::Create(exp_type, Function::ExternalLinkage, str_exp, TheModule.get());
+  FunctionType *ln_type = FunctionType::get(flo, {flo}, false);
+  Function::Create(ln_type, Function::ExternalLinkage, str_ln, TheModule.get());
+  FunctionType *pi_type = FunctionType::get(flo, {}, false);
+  Function::Create(pi_type, Function::ExternalLinkage, str_pi, TheModule.get());
+
+  // Initialize incr decr
+  FunctionType *incr_type = FunctionType::get(voi, {PointerType::get(i64, 0)}, false);
+  Function::Create(incr_type, Function::ExternalLinkage, str_incr, TheModule.get());
+  FunctionType *decr_type = FunctionType::get(voi, {PointerType::get(i64, 0)}, false);
+  Function::Create(decr_type, Function::ExternalLinkage, str_decr, TheModule.get());
+
+  // Initialize Convertion Functions
+  FunctionType *float_of_int_type = FunctionType::get(flo, {i64}, false);
+  Function::Create(float_of_int_type, Function::ExternalLinkage, str_float_of_int, TheModule.get());
+  FunctionType *int_of_float_type = FunctionType::get(i64, {flo}, false);
+  Function::Create(int_of_float_type, Function::ExternalLinkage, str_int_of_float, TheModule.get());
+  FunctionType *round_type = FunctionType::get(i64, {flo}, false);
+  Function::Create(round_type, Function::ExternalLinkage, str_round, TheModule.get());
+  FunctionType *int_of_char_type = FunctionType::get(i64, {i8}, false);
+  Function::Create(int_of_char_type, Function::ExternalLinkage, str_int_of_char, TheModule.get());
+  FunctionType *char_of_int_type = FunctionType::get(i8, {i64}, false);
+  Function::Create(char_of_int_type, Function::ExternalLinkage, str_char_of_int, TheModule.get());
+
+  // Initialize String Functions
+  FunctionType *strlen_type = FunctionType::get(i64, {PointerType::get(i8, 0)}, false);
+  Function::Create(strlen_type, Function::ExternalLinkage, str_strlen, TheModule.get());
+  FunctionType *strcmp_type = FunctionType::get(i64, {PointerType::get(i8, 0), PointerType::get(i8, 0)}, false);
+  Function::Create(strcmp_type, Function::ExternalLinkage, str_strcmp, TheModule.get());
+  FunctionType *strcpy_type = FunctionType::get(voi, {PointerType::get(i8, 0), PointerType::get(i8, 0)}, false);
+  Function::Create(strcpy_type, Function::ExternalLinkage, str_strcpy, TheModule.get());
+  FunctionType *strcat_type = FunctionType::get(voi, {PointerType::get(i8, 0), PointerType::get(i8, 0)}, false);
+  Function::Create(strcat_type, Function::ExternalLinkage, str_strcat, TheModule.get());
 
   // Define and start the main function.
   FunctionType *main_type = FunctionType::get(i64, {}, false);
@@ -150,6 +170,11 @@ llvm::Type *Type_Func::compile() const
   FunctionType *fn_type = FunctionType::get(tmp->compile(), from_vec, false);
   PointerType *fn_ptr_type = PointerType::getUnqual(fn_type);
   return fn_ptr_type;
+}
+
+llvm::Type *Type_Ref::compile() const
+{
+  return PointerType::get(typ->compile(), 0);
 }
 
 Value *LetDef::compile() const
@@ -233,6 +258,19 @@ Value *NormalDef::compile2() const
   return nullptr;
 }
 
+Value *MutableDef::compile() const
+{
+  if (typ->get_type() != type_unit)
+  {
+    llvm::Type *t = typ->compile();
+    llvm::Type *pt = PointerType::get(t, 0);
+    GlobalVariable *globalVar = new GlobalVariable(*TheModule, pt, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(pt), id);
+    AllocaInst *alloc = Builder.CreateAlloca(t, nullptr, "alloc");
+    Builder.CreateStore(alloc, globalVar);
+  }
+  return nullptr;
+}
+
 Value *call::compile() const
 {
   std::vector<Value *> value_vec;
@@ -300,7 +338,7 @@ Value *id_Expr::compile() const
   // constant or variable
   GlobalVariable *var = TheModule->getGlobalVariable(id, true);
   if (var != nullptr)
-    return Builder.CreateLoad(var, id);
+    return Builder.CreateLoad(var, "loadtmp");
   // function
   Function *func = TheModule->getFunction(id);
   if (func != nullptr)
@@ -315,6 +353,28 @@ Value *id_Expr::compile() const
   for (Function::arg_iterator arg = f->arg_begin(); arg != f->arg_end(); arg++)
     if (arg->getName() == id)
       return arg;
+  return nullptr;
+}
+
+Value *UnOp::compile() const
+{
+  llvm::Value *v = expr->compile();
+  switch (op)
+  {
+  case unop_plus:
+    return v;
+  case unop_minus:
+    return Builder.CreateNeg(v, "negtmp");
+  case unop_float_plus:
+    return v;
+  case unop_float_minus:
+    return Builder.CreateFNeg(v, "fnegtmp");
+  case unop_exclamation:
+    return Builder.CreateLoad(v, "loadtmp");
+  case unop_not:
+  case unop_delete:
+    return nullptr;
+  }
   return nullptr;
 }
 
@@ -373,7 +433,8 @@ Value *BinOp::compile() const
   case binop_and:
   case binop_or:
   case binop_assign:
-    return Builder.CreateStore(l, r);
+    Builder.CreateStore(r, l);
+    return nullptr;
   case binop_semicolon:
     return r;
   }

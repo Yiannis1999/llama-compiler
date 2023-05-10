@@ -11,4 +11,4 @@ AST(
     )
 )
 *)
-let main = print_string "Hello world!\n"
+let main = print_float (-.1.0)

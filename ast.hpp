@@ -111,37 +111,8 @@ protected:
 
   static LLVMContext TheContext;
   static IRBuilder<> Builder;
-
   static std::unique_ptr<Module> TheModule;
   static std::unique_ptr<legacy::FunctionPassManager> TheFPM;
-
-  static GlobalVariable *TheVars;
-  static GlobalVariable *TheNL;
-
-  // Write Functions
-  static Function *TheWriteInteger;
-  static Function *TheWriteBoolean;
-  static Function *TheWriteChar;
-  static Function *TheWriteReal;
-  static Function *TheWriteString;
-
-  // Read Functions
-  static Function *TheReadInteger;
-  static Function *TheReadBoolean;
-  static Function *TheReadChar;
-  static Function *TheReadReal;
-  static Function *TheReadString;
-
-  // Math Functions
-  static Function *abs;
-  static Function *fabs;
-  static Function *sqrt;
-  static Function *cos;
-  static Function *tan;
-  static Function *atan;
-  static Function *exp;
-  static Function *ln;
-  static Function *pi;
 
   // Type Shortcuts
   static llvm::Type *i1;
@@ -288,6 +259,7 @@ public:
   virtual ::Type *getChild1() override;
   virtual bool equals(::Type *other) override;
   virtual void sem() override;
+  virtual llvm::Type *compile() const override;
 
 private:
   ::Type *typ;
@@ -606,6 +578,7 @@ public:
   UnOp(unop_enum op1, Expr *e1) : op(op1), expr(e1) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile() const override;
 
 private:
   unop_enum op;
@@ -848,20 +821,6 @@ public:
   virtual Value *compile2() const { return nullptr; }
 };
 
-class MutableDef : public Def
-{
-public:
-  MutableDef(std::string s, std::vector<Expr *> *e, ::Type *t)
-      : id(s), expr_vec(e), typ(t) {}
-  virtual void printOn(std::ostream &out) const override;
-  virtual void sem() override;
-
-private:
-  std::string id;
-  std::vector<Expr *> *expr_vec;
-  ::Type *typ;
-};
-
 class NormalDef : public Def
 {
 public:
@@ -879,6 +838,21 @@ private:
   std::vector<Par *> *par_vec;
   ::Type *typ;
   Expr *expr;
+};
+
+class MutableDef : public Def
+{
+public:
+  MutableDef(std::string s, std::vector<Expr *> *e, ::Type *t)
+      : id(s), expr_vec(e), typ(t) {}
+  virtual void printOn(std::ostream &out) const override;
+  virtual void sem() override;
+  virtual Value *compile() const override;
+
+private:
+  std::string id;
+  std::vector<Expr *> *expr_vec;
+  ::Type *typ;
 };
 
 class LetDef : public Stmt

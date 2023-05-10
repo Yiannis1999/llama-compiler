@@ -4,5 +4,5 @@ then
     echo "Compiling $1"
     ./llama < $1 > a.ll || exit 1
     llc-13 a.ll -o a.s
-    gcc a.s ./lib/lib.a -o a.out -no-pie -g
+    gcc a.s ./lib/lib.a -o a.out -lm -no-pie -g
 fi
