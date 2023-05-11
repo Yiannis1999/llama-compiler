@@ -38,6 +38,10 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   flo = llvm::Type::getFloatTy(TheContext);
   voi = llvm::Type::getVoidTy(TheContext);
 
+  // Initialize pow
+  FunctionType *pow_type = FunctionType::get(flo, {flo, flo}, false);
+  Function::Create(pow_type, Function::ExternalLinkage, "powf", TheModule.get());
+
   // Initialize Write Functions
   FunctionType *print_int_type = FunctionType::get(voi, {i64}, false);
   Function::Create(print_int_type, Function::ExternalLinkage, str_print_int, TheModule.get());
@@ -239,11 +243,11 @@ Value *NormalDef::compile2() const
 {
   if (par_vec->size() == 0) // constant
   {
-    Value *val = expr->compile();
+    Value *v = expr->compile();
     if (typ->get_type() != type_unit)
     {
       GlobalVariable *globalVar = TheModule->getGlobalVariable(id, true);
-      Builder.CreateStore(val, globalVar);
+      Builder.CreateStore(v, globalVar);
     }
   }
   else // function
@@ -330,7 +334,7 @@ Value *Str_Expr::compile() const
 
 Value *Bool_Expr::compile() const
 {
-  return c8(boolean);
+  return c1(boolean);
 }
 
 Value *id_Expr::compile() const
@@ -372,16 +376,56 @@ Value *UnOp::compile() const
   case unop_exclamation:
     return Builder.CreateLoad(v, "loadtmp");
   case unop_not:
+    return Builder.CreateNot(v, "nottmp");
   case unop_delete:
     return nullptr;
+  default:
+    return nullptr;
   }
-  return nullptr;
 }
 
 Value *BinOp::compile() const
 {
-  llvm::Value *l = left->compile();
-  llvm::Value *r = right->compile();
+  Value *l = left->compile();
+  if (op == binop_and)
+  {
+    Function *TheFunction = Builder.GetInsertBlock()->getParent();
+    BasicBlock *ThenBB = BasicBlock::Create(TheContext, "then", TheFunction);
+    BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else", TheFunction);
+    BasicBlock *AfterBB = BasicBlock::Create(TheContext, "endif", TheFunction);
+    Builder.CreateCondBr(l, ThenBB, ElseBB);
+    Builder.SetInsertPoint(ThenBB);
+    Value *r = right->compile();
+    ThenBB = Builder.GetInsertBlock();
+    Builder.CreateBr(AfterBB);
+    Builder.SetInsertPoint(ElseBB);
+    Builder.CreateBr(AfterBB);
+    Builder.SetInsertPoint(AfterBB);
+    PHINode *phi = Builder.CreatePHI(typ->compile(), 2, "phi");
+    phi->addIncoming(r, ThenBB);
+    phi->addIncoming(l, ElseBB);
+    return phi;
+  }
+  if (op == binop_or)
+  {
+    Function *TheFunction = Builder.GetInsertBlock()->getParent();
+    BasicBlock *ThenBB = BasicBlock::Create(TheContext, "then", TheFunction);
+    BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else", TheFunction);
+    BasicBlock *AfterBB = BasicBlock::Create(TheContext, "endif", TheFunction);
+    Builder.CreateCondBr(l, ThenBB, ElseBB);
+    Builder.SetInsertPoint(ThenBB);
+    Builder.CreateBr(AfterBB);
+    Builder.SetInsertPoint(ElseBB);
+    Value *r = right->compile();
+    ElseBB = Builder.GetInsertBlock();
+    Builder.CreateBr(AfterBB);
+    Builder.SetInsertPoint(AfterBB);
+    PHINode *phi = Builder.CreatePHI(typ->compile(), 2, "phi");
+    phi->addIncoming(l, ThenBB);
+    phi->addIncoming(r, ElseBB);
+    return phi;
+  }
+  Value *r = right->compile();
   switch (op)
   {
   case binop_plus:
@@ -403,17 +447,19 @@ Value *BinOp::compile() const
   case binop_float_div:
     return Builder.CreateFDiv(l, r, "fdivtmp");
   case binop_pow:
-    // return Builder.CreateCall(powFunction, { l, r }, "fpowtmp");
+    return Builder.CreateCall(TheModule->getFunction("powf"), {l, r}, "fpowtmp");
   case binop_struct_eq:
     if (l->getType()->isFloatingPointTy())
       return Builder.CreateFCmpOEQ(l, r, "eqtmp");
     return Builder.CreateICmpEQ(l, r, "eqtmp");
-  case binop_struct_diff:
+  case binop_struct_ne:
     if (l->getType()->isFloatingPointTy())
       return Builder.CreateFCmpONE(l, r, "eqtmp");
     return Builder.CreateICmpNE(l, r, "eqtmp");
-  case binop_logic_eq:
-  case binop_logic_diff:
+  case binop_phys_eq:
+    return Builder.CreateICmpEQ(Builder.CreateBitCast(l, i64), Builder.CreateBitCast(r, i64), "eqtmp");
+  case binop_phys_ne:
+    return Builder.CreateICmpNE(Builder.CreateBitCast(l, i64), Builder.CreateBitCast(r, i64), "eqtmp");
   case binop_l:
     if (l->getType()->isFloatingPointTy())
       return Builder.CreateFCmpOLT(l, r, "eqtmp");
@@ -430,21 +476,19 @@ Value *BinOp::compile() const
     if (l->getType()->isFloatingPointTy())
       return Builder.CreateFCmpOGE(l, r, "eqtmp");
     return Builder.CreateICmpSGE(l, r, "eqtmp");
-  case binop_and:
-  case binop_or:
   case binop_assign:
     Builder.CreateStore(r, l);
     return nullptr;
   case binop_semicolon:
     return r;
+  default:
+    return nullptr;
   }
-  return nullptr;
 }
 
 Value *If::compile() const
 {
-  Value *v = expr1->compile();
-  Value *cond = Builder.CreateICmpEQ(v, c1(true), "if_cond");
+  Value *cond = expr1->compile();
   Function *TheFunction = Builder.GetInsertBlock()->getParent();
   BasicBlock *ThenBB = BasicBlock::Create(TheContext, "then", TheFunction);
   BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else", TheFunction);
@@ -463,10 +507,10 @@ Value *If::compile() const
   Builder.SetInsertPoint(AfterBB);
   if (typ->get_type() == type_unit)
     return nullptr;
-  PHINode *ret = Builder.CreatePHI(typ->compile(), 2, "ret");
-  ret->addIncoming(v2, ThenBB);
-  ret->addIncoming(v3, ElseBB);
-  return ret;
+  PHINode *phi = Builder.CreatePHI(typ->compile(), 2, "phi");
+  phi->addIncoming(v2, ThenBB);
+  phi->addIncoming(v3, ElseBB);
+  return phi;
 }
 
 Value *LetIn::compile() const

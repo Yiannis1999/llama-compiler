@@ -79,11 +79,11 @@ CHAR {SIMPLE_CHAR}|{ESC_CHAR}
 "**"  { return T_pow_op; }
 "&&"  { return T_and_op; }
 "||" { return T_or_op; }
-"<>" { return T_struct_diff_op; }
+"<>" { return T_struct_ne_op; }
 "<=" { return T_leq_op; }
 ">=" { return T_geq_op; }
 "==" { return T_eq_op; }
-"!=" { return T_diff_op; }
+"!=" { return T_ne_op; }
 ":=" { return T_assign_op; }
 
 \-\-.*  { /* nothing' */ }

@@ -56,11 +56,11 @@ TypeDefTable tt;
 %token T_pow_op
 %token T_and_op
 %token T_or_op
-%token T_struct_diff_op
+%token T_struct_ne_op
 %token T_leq_op
 %token T_geq_op
 %token T_eq_op
-%token T_diff_op
+%token T_ne_op
 %token T_assign_op
 
 %nonassoc LET_IN
@@ -70,7 +70,7 @@ TypeDefTable tt;
 %nonassoc T_assign_op
 %left T_or_op
 %left T_and_op
-%nonassoc '=' T_struct_diff_op '>' '<' T_leq_op T_geq_op T_eq_op T_diff_op
+%nonassoc '=' T_struct_ne_op '>' '<' T_leq_op T_geq_op T_eq_op T_ne_op
 %left '+' '-' T_plus_op T_minus_op
 %left '*' '/' T_mult_op T_div_op T_mod
 %right T_pow_op
@@ -296,13 +296,13 @@ expr4:
 | expr4 T_mod expr4 { $$ = new BinOp($1, binop_mod , $3); }
 | expr4 T_pow_op expr4 { $$ = new BinOp($1, binop_pow , $3); }
 | expr4 '=' expr4 { $$ = new BinOp($1, binop_struct_eq , $3); }
-| expr4 T_struct_diff_op expr4 { $$ = new BinOp($1, binop_struct_diff , $3); }
+| expr4 T_struct_ne_op expr4 { $$ = new BinOp($1, binop_struct_ne , $3); }
 | expr4 '<' expr4 { $$ = new BinOp($1, binop_l , $3); }
 | expr4 '>' expr4 { $$ = new BinOp($1, binop_g , $3); }
 | expr4 T_leq_op expr4 { $$ = new BinOp($1, binop_leq , $3); }
 | expr4 T_geq_op expr4 { $$ = new BinOp($1, binop_geq , $3); }
-| expr4 T_eq_op expr4 { $$ = new BinOp($1, binop_logic_eq , $3); } 
-| expr4 T_diff_op expr4 { $$ = new BinOp($1, binop_logic_diff , $3); }
+| expr4 T_eq_op expr4 { $$ = new BinOp($1, binop_phys_eq , $3); } 
+| expr4 T_ne_op expr4 { $$ = new BinOp($1, binop_phys_ne , $3); }
 | expr4 T_and_op expr4 { $$ = new BinOp($1, binop_and , $3); }
 | expr4 T_or_op expr4 { $$ = new BinOp($1, binop_or , $3); }
 | expr4 T_assign_op expr4 { $$ = new BinOp($1, binop_assign , $3); }
