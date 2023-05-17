@@ -216,25 +216,26 @@ Value *NormalDef::compile() const
         break;
       default:
         from.push_back(t);
+        new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), par->id);
         break;
       }
     }
     llvm::Type *to = typ->compile();
     FunctionType *fn_type = FunctionType::get(to, from, false);
-    Function *func = Function::Create(fn_type, Function::ExternalLinkage, id, TheModule.get());
-    Function::arg_iterator arg = func->arg_begin();
-    for (Par *par : *par_vec)
-    {
-      switch (par->typ->get_type())
-      {
-      case type_unit:
-        break;
-      default:
-        arg->setName(par->id);
-        std::advance(arg, 1);
-        break;
-      }
-    }
+    Function::Create(fn_type, Function::ExternalLinkage, id, TheModule.get());
+    // Function::arg_iterator arg = func->arg_begin();
+    // for (Par *par : *par_vec)
+    // {
+    //   switch (par->typ->get_type())
+    //   {
+    //   case type_unit:
+    //     break;
+    //   default:
+    //     arg->setName(par->id);
+    //     std::advance(arg, 1);
+    //     break;
+    //   }
+    // }
   }
   return nullptr;
 }
@@ -246,8 +247,8 @@ Value *NormalDef::compile2() const
     Value *v = expr->compile();
     if (typ->get_type() != type_unit)
     {
-      GlobalVariable *globalVar = TheModule->getGlobalVariable(id, true);
-      Builder.CreateStore(v, globalVar);
+      GlobalVariable *var = TheModule->getGlobalVariable(id, true);
+      Builder.CreateStore(v, var);
     }
   }
   else // function
@@ -256,6 +257,20 @@ Value *NormalDef::compile2() const
     BasicBlock *PrevBB = Builder.GetInsertBlock();
     BasicBlock *BodyBB = BasicBlock::Create(TheContext, id, func);
     Builder.SetInsertPoint(BodyBB);
+    Function::arg_iterator arg = func->arg_begin();
+    for (Par *par : *par_vec)
+    {
+      switch (par->typ->get_type())
+      {
+      case type_unit:
+        break;
+      default:
+        GlobalVariable *var = TheModule->getGlobalVariable(par->id, true);
+        Builder.CreateStore(arg, var);
+        std::advance(arg, 1);
+        break;
+      }
+    }
     Builder.CreateRet(expr->compile());
     Builder.SetInsertPoint(PrevBB);
   }
@@ -266,11 +281,22 @@ Value *MutableDef::compile() const
 {
   if (typ->get_type() != type_unit)
   {
+    Value *size = c64(1);
+    int i = 1;
+    if (expr_vec != nullptr)
+      for (Expr *e : *expr_vec)
+      {
+        Value *v = e->compile();
+        std::string name = "dim_" + std::to_string(i++) + "_" + id;
+        GlobalVariable *var = new GlobalVariable(*TheModule, i64, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(i64), name);
+        Builder.CreateStore(v, var);
+        size = Builder.CreateMul(size, v);
+      }
     llvm::Type *t = typ->compile();
     llvm::Type *pt = PointerType::get(t, 0);
-    GlobalVariable *globalVar = new GlobalVariable(*TheModule, pt, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(pt), id);
-    AllocaInst *alloc = Builder.CreateAlloca(t, nullptr, "alloc");
-    Builder.CreateStore(alloc, globalVar);
+    GlobalVariable *var = new GlobalVariable(*TheModule, pt, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(pt), id);
+    AllocaInst *alloc = Builder.CreateAlloca(t, size, "alloc");
+    Builder.CreateStore(alloc, var);
   }
   return nullptr;
 }
@@ -337,6 +363,29 @@ Value *Bool_Expr::compile() const
   return c1(boolean);
 }
 
+Value *Array::compile() const
+{
+  if (typ->getChild1()->get_type() != type_unit)
+  {
+    Value *offset = c64(0);
+    Value *coeff = c64(1);
+    int i = 1;
+    if (expr_vec != nullptr)
+      for (Expr *e : *expr_vec)
+      {
+        Value *v = e->compile();
+        offset = Builder.CreateAdd(offset, Builder.CreateMul(v, coeff));
+        std::string name = "dim_" + std::to_string(i++) + "_" + id;
+        GlobalVariable *var = TheModule->getGlobalVariable(name, true);
+        coeff = Builder.CreateMul(coeff, Builder.CreateLoad(var));
+      }
+    GlobalVariable *var = TheModule->getGlobalVariable(id, true);
+    Value *ptr = Builder.CreateLoad(var, "loadtmp");
+    return Builder.CreateGEP(ptr, {offset}, id + "_ptr");
+  }
+  return nullptr;
+}
+
 Value *id_Expr::compile() const
 {
   // constant or variable
@@ -352,17 +401,12 @@ Value *id_Expr::compile() const
     Value *fptr = ConstantExpr::getBitCast(func, fn_ptr_type);
     return fptr;
   }
-  // argument
-  Function *f = Builder.GetInsertBlock()->getParent();
-  for (Function::arg_iterator arg = f->arg_begin(); arg != f->arg_end(); arg++)
-    if (arg->getName() == id)
-      return arg;
   return nullptr;
 }
 
 Value *UnOp::compile() const
 {
-  llvm::Value *v = expr->compile();
+  Value *v = expr->compile();
   switch (op)
   {
   case unop_plus:

@@ -479,6 +479,7 @@ public:
   Array(std::string s, std::vector<Expr *> *v) : id(s), expr_vec(v) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile() const override;
 
 private:
   std::string id;
