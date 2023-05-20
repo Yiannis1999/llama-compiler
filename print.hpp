@@ -153,7 +153,7 @@ void For::printOn(std::ostream &out) const
 {
   std::string for_str = down ? " down to " : " to ";
   out << "For(" << id << " from " << *start << for_str << *end << ") do ("
-      << *do_stmt << ")";
+      << *stmt << ")";
 }
 
 // class call

@@ -404,6 +404,37 @@ Value *id_Expr::compile() const
   return nullptr;
 }
 
+Value *For::compile() const
+{
+  GlobalVariable *var = new GlobalVariable(*TheModule, i64, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(i64), id);
+  Builder.CreateStore(start->compile(), var);
+  BasicBlock *PrevBB = Builder.GetInsertBlock();
+  Function *TheFunction = PrevBB->getParent();
+  BasicBlock *LoopBB = BasicBlock::Create(TheContext, "loop", TheFunction);
+  BasicBlock *BodyBB = BasicBlock::Create(TheContext, "body", TheFunction);
+  BasicBlock *AfterBB = BasicBlock::Create(TheContext, "endfor", TheFunction);
+  Builder.CreateBr(LoopBB);
+  Builder.SetInsertPoint(LoopBB);
+  Value *iter = Builder.CreateLoad(var, "iter");
+  Value *loop_cond;
+  if (down)
+    loop_cond = Builder.CreateICmpSGE(iter, end->compile(), "loop_cond");
+  else
+    loop_cond = Builder.CreateICmpSLE(iter, end->compile(), "loop_cond");
+  Builder.CreateCondBr(loop_cond, BodyBB, AfterBB);
+  Builder.SetInsertPoint(BodyBB);
+  stmt->compile();
+  Value *new_iter;
+  if (down)
+    new_iter = Builder.CreateSub(iter, c64(1), "new_iter");
+  else
+    new_iter = Builder.CreateAdd(iter, c64(1), "new_iter");
+  Builder.CreateStore(new_iter, var);
+  Builder.CreateBr(LoopBB);
+  Builder.SetInsertPoint(AfterBB);
+  return nullptr;
+}
+
 Value *UnOp::compile() const
 {
   Value *v = expr->compile();

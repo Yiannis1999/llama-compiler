@@ -360,7 +360,7 @@ void For::sem()
   end->type_check(new Type_Int());
   st.openScope();
   st.insert(id, new Type_Int());
-  do_stmt->sem();
+  stmt->sem();
   st.closeScope();
   typ = new Type_Unit();
 }

@@ -535,14 +535,15 @@ private:
 class For : public Expr
 {
 public:
-  For(std::string id1, Expr *start1, Expr *end1, Expr *do_stmt1, bool down1)
-      : id(id1), start(start1), end(end1), do_stmt(do_stmt1), down(down1) {}
+  For(std::string id1, Expr *start1, Expr *end1, Expr *stmt1, bool down1)
+      : id(id1), start(start1), end(end1), stmt(stmt1), down(down1) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile() const override;
 
 private:
   std::string id;
-  Expr *start, *end, *do_stmt;
+  Expr *start, *end, *stmt;
   bool down;
 };
 
