@@ -186,7 +186,7 @@ main_type Type_Array::get_type() { return type_array; }
 
 ::Type *Type_Array::getChild1() { return typ; }
 
-long unsigned int Type_Array::getDimensions() { return dim; }
+int Type_Array::getDim() { return dim; }
 
 bool Type_Array::equals(::Type *other)
 {
@@ -196,7 +196,7 @@ bool Type_Array::equals(::Type *other)
     return other->equals(this);
   if (this->get_type() != other->get_type())
     return false;
-  return typ->equals(other->getChild1()) && dim == other->getDimensions();
+  return typ->equals(other->getChild1()) && dim == other->getDim();
 }
 void Type_Array::sem() { typ->sem(); }
 
@@ -236,9 +236,9 @@ main_type Type_Undefined::get_type()
   return typ == nullptr ? nullptr : typ->getChild2();
 }
 
-long unsigned int Type_Undefined::getDimensions()
+int Type_Undefined::getDim()
 {
-  return typ == nullptr ? 0 : typ->getDimensions();
+  return typ == nullptr ? 0 : typ->getDim();
 }
 
 std::string Type_Undefined::get_id()
@@ -326,7 +326,7 @@ void Dim::sem()
   {
     if (se->type->get_type() != type_array)
       semanticError("Dim: Type mismatch");
-    else if (ind < 1 || ind > se->type->getDimensions())
+    else if (ind < 1 || ind > se->type->getDim())
       semanticError("Array dimensions mismatch");
   }
   typ = new Type_Int();

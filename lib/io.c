@@ -57,7 +57,7 @@ bool read_bool_6()
 char read_char_7()
 {
     char c;
-    scanf(" %c", &c);
+    scanf("%c", &c);
     return c;
 }
 

@@ -176,7 +176,7 @@ public:
   virtual main_type get_type() { return type_undefined; }
   virtual ::Type *getChild1() { return nullptr; }
   virtual ::Type *getChild2() { return nullptr; }
-  virtual long unsigned int getDimensions() { return 0; }
+  virtual int getDim() { return 0; }
   virtual std::string get_id() { return ""; }
   virtual bool equals(::Type *other)
   {
@@ -268,17 +268,17 @@ private:
 class Type_Array : public ::Type
 {
 public:
-  Type_Array(long unsigned int i, ::Type *t1) : dim(i), typ(t1) {}
+  Type_Array(int i, ::Type *t1) : dim(i), typ(t1) {}
   virtual void printOn(std::ostream &out) const override;
   virtual main_type get_type() override;
   virtual ::Type *getChild1() override;
-  virtual long unsigned int getDimensions() override;
+  virtual int getDim() override;
   virtual bool equals(::Type *other) override;
   virtual void sem() override;
-  virtual llvm::Type *compile() const override { return PointerType::get(i8, 0); };
+  virtual llvm::Type *compile() const override { return PointerType::get(typ->compile(), 0); };
 
 private:
-  long unsigned int dim;
+  int dim;
   ::Type *typ;
 };
 
@@ -304,7 +304,7 @@ public:
   virtual main_type get_type() override;
   virtual ::Type *getChild1() override;
   virtual ::Type *getChild2() override;
-  virtual long unsigned int getDimensions() override;
+  virtual int getDim() override;
   virtual std::string get_id() override;
   virtual bool equals(::Type *other) override;
   virtual llvm::Type *compile() const override { return typ == nullptr ? i64 : typ->compile(); };
@@ -489,13 +489,14 @@ private:
 class Dim : public Expr
 {
 public:
-  Dim(std::string s, unsigned long int i = 1) : id(s), ind(i) {}
+  Dim(std::string s, int i = 1) : id(s), ind(i) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile() const override;
 
 private:
   std::string id;
-  unsigned long int ind;
+  int ind;
 };
 
 class id_Expr : public Expr

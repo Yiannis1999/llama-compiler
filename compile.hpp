@@ -281,23 +281,32 @@ Value *MutableDef::compile() const
 {
   if (typ->get_type() != type_unit)
   {
+    std::vector<Value *> value_vec;
     Value *size = c64(1);
-    int i = 1;
     if (expr_vec != nullptr)
+    {
       for (Expr *e : *expr_vec)
       {
         Value *v = e->compile();
-        std::string name = "dim_" + std::to_string(i++) + "_" + id;
-        GlobalVariable *var = new GlobalVariable(*TheModule, i64, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(i64), name);
-        Builder.CreateStore(v, var);
+        value_vec.push_back(v);
         size = Builder.CreateMul(size, v);
       }
+      size = Builder.CreateAdd(size, c64(8 * expr_vec->size()));
+    }
     llvm::Type *t = typ->compile();
     llvm::Type *pt = PointerType::get(t, 0);
     GlobalVariable *var = new GlobalVariable(*TheModule, pt, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(pt), id);
-    AllocaInst *alloc = Builder.CreateAlloca(t, size, "alloc");
+    Value *alloc = Builder.CreateAlloca(t, size);
+    if (expr_vec != nullptr)
+    {
+      alloc = Builder.CreateGEP(alloc, {c64(8 * expr_vec->size())});
+      Value *ptr64 = Builder.CreateBitCast(alloc, PointerType::get(i64, 0));
+      int i = 0;
+      for (Value *v : value_vec)
+        Builder.CreateStore(v, Builder.CreateGEP(ptr64, {c64(--i)}));
+    }
     Builder.CreateStore(alloc, var);
-  }
+  };
   return nullptr;
 }
 
@@ -354,8 +363,16 @@ Value *Char_Expr::compile() const
 
 Value *Str_Expr::compile() const
 {
-  Value *strPtr = Builder.CreateGlobalStringPtr(str);
-  return strPtr;
+  std::vector<Constant *> value_vec;
+  value_vec.push_back(c8(str.length()));
+  for (int i = 0; i < 7; i++)
+    value_vec.push_back(c8(0));
+  for (char c : str)
+    value_vec.push_back(c8(c));
+  value_vec.push_back(c8(0));
+  ArrayType *str_type = ArrayType::get(i8, value_vec.size());
+  Value *str = new GlobalVariable(*TheModule, str_type, true, GlobalValue::PrivateLinkage, ConstantArray::get(str_type, value_vec), "str");
+  return Builder.CreateGEP(str, {c64(0), c64(8)}, "strtmp");
 }
 
 Value *Bool_Expr::compile() const
@@ -367,23 +384,28 @@ Value *Array::compile() const
 {
   if (typ->getChild1()->get_type() != type_unit)
   {
+    Value *ptr = Builder.CreateLoad(TheModule->getGlobalVariable(id, true));
+    Value *ptr64 = Builder.CreateBitCast(ptr, PointerType::get(i64, 0));
     Value *offset = c64(0);
     Value *coeff = c64(1);
-    int i = 1;
-    if (expr_vec != nullptr)
-      for (Expr *e : *expr_vec)
-      {
-        Value *v = e->compile();
-        offset = Builder.CreateAdd(offset, Builder.CreateMul(v, coeff));
-        std::string name = "dim_" + std::to_string(i++) + "_" + id;
-        GlobalVariable *var = TheModule->getGlobalVariable(name, true);
-        coeff = Builder.CreateMul(coeff, Builder.CreateLoad(var));
-      }
-    GlobalVariable *var = TheModule->getGlobalVariable(id, true);
-    Value *ptr = Builder.CreateLoad(var, "loadtmp");
+    int i = -expr_vec->size();
+    for (auto e = expr_vec->rbegin(); e != expr_vec->rend(); e++)
+    {
+      Value *v = (*e)->compile();
+      offset = Builder.CreateAdd(offset, Builder.CreateMul(v, coeff));
+      Value *dim = Builder.CreateLoad(Builder.CreateGEP(ptr64, {c64(i++)}));
+      coeff = Builder.CreateMul(coeff, dim);
+    }
     return Builder.CreateGEP(ptr, {offset}, id + "_ptr");
   }
   return nullptr;
+}
+
+Value *Dim::compile() const
+{
+  Value *ptr = Builder.CreateLoad(TheModule->getGlobalVariable(id, true));
+  Value *ptr64 = Builder.CreateBitCast(ptr, PointerType::get(i64, 0));
+  return Builder.CreateLoad(Builder.CreateGEP(ptr64, {c64(-ind)}, "dimtmp"));
 }
 
 Value *id_Expr::compile() const
@@ -391,7 +413,7 @@ Value *id_Expr::compile() const
   // constant or variable
   GlobalVariable *var = TheModule->getGlobalVariable(id, true);
   if (var != nullptr)
-    return Builder.CreateLoad(var, "loadtmp");
+    return Builder.CreateLoad(var, "idtmp");
   // function
   Function *func = TheModule->getFunction(id);
   if (func != nullptr)
@@ -449,7 +471,7 @@ Value *UnOp::compile() const
   case unop_float_minus:
     return Builder.CreateFNeg(v, "fnegtmp");
   case unop_exclamation:
-    return Builder.CreateLoad(v, "loadtmp");
+    return Builder.CreateLoad(v, "dereftmp");
   case unop_not:
     return Builder.CreateNot(v, "nottmp");
   case unop_delete:
