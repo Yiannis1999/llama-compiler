@@ -426,6 +426,24 @@ Value *id_Expr::compile() const
   return nullptr;
 }
 
+Value *While::compile() const
+{
+  BasicBlock *PrevBB = Builder.GetInsertBlock();
+  Function *TheFunction = PrevBB->getParent();
+  BasicBlock *LoopBB = BasicBlock::Create(TheContext, "loop", TheFunction);
+  BasicBlock *BodyBB = BasicBlock::Create(TheContext, "body", TheFunction);
+  BasicBlock *AfterBB = BasicBlock::Create(TheContext, "endwhile", TheFunction);
+  Builder.CreateBr(LoopBB);
+  Builder.SetInsertPoint(LoopBB);
+  Value *loop_cond = cond->compile();
+  Builder.CreateCondBr(loop_cond, BodyBB, AfterBB);
+  Builder.SetInsertPoint(BodyBB);
+  stmt->compile();
+  Builder.CreateBr(LoopBB);
+  Builder.SetInsertPoint(AfterBB);
+  return nullptr;
+}
+
 Value *For::compile() const
 {
   GlobalVariable *var = new GlobalVariable(*TheModule, i64, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(i64), id);
@@ -608,6 +626,13 @@ Value *If::compile() const
   phi->addIncoming(v2, ThenBB);
   phi->addIncoming(v3, ElseBB);
   return phi;
+}
+
+Value *New::compile() const
+{
+  if (ty->get_type() != type_unit)
+    return Builder.CreateAlloca(ty->compile(), c64(1));
+  return nullptr;
 }
 
 Value *LetIn::compile() const

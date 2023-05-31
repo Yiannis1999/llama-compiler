@@ -528,6 +528,7 @@ public:
   While(Expr *e1, Expr *e2) : cond(e1), stmt(e2) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile() const override;
 
 private:
   Expr *cond, *stmt;
@@ -617,12 +618,13 @@ private:
 class New : public Expr
 {
 public:
-  New(::Type *t) : typ(t) {}
+  New(::Type *t) : ty(t) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile() const override;
 
 private:
-  ::Type *typ;
+  ::Type *ty;
 };
 
 class Pattern : public AST

@@ -531,10 +531,10 @@ void If::sem()
 
 void New::sem()
 {
-  if (typ->get_type() == type_array)
+  if (ty->get_type() == type_array)
     semanticError("Reference cannot be of Type array");
-  typ->sem();
-  typ = new Type_Ref(typ);
+  ty->sem();
+  typ = new Type_Ref(ty);
 }
 
 // class Pattern_Int_Expr
