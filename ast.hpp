@@ -120,7 +120,7 @@ protected:
   static llvm::Type *i32;
   static llvm::Type *i64;
   static llvm::Type *flo;
-  static llvm::Type *voi;
+  static llvm::StructType *voi;
 
   // LLVM helper functions
   static ConstantInt *c1(bool b)
@@ -143,6 +143,10 @@ protected:
   {
     return ConstantFP::get(flo, f);
   }
+  static Constant *cvoid()
+  {
+    return llvm::ConstantStruct::get(voi, {});
+  }
 };
 
 inline std::ostream &operator<<(std::ostream &out, const AST &t)
@@ -154,7 +158,7 @@ inline std::ostream &operator<<(std::ostream &out, const AST &t)
 class Stmt : public AST
 {
 public:
-  virtual Value *compile() const { return nullptr; }
+  virtual void compile() const {}
 };
 
 class Program : public AST
@@ -163,7 +167,7 @@ public:
   Program(std::vector<Stmt *> *s) : statements(s) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
-  virtual Value *compile() const;
+  virtual void compile() const;
   void llvm_compile_and_dump(bool optimize);
 
 private:
@@ -471,6 +475,7 @@ public:
   Unit_Expr() {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile() const override;
 };
 
 class Array : public Expr
@@ -822,8 +827,8 @@ class Def : public AST
 {
 public:
   virtual void sem2(){};
-  virtual Value *compile() const { return nullptr; }
-  virtual Value *compile2() const { return nullptr; }
+  virtual void compile() const {}
+  virtual void compile2() const {}
 };
 
 class NormalDef : public Def
@@ -835,8 +840,8 @@ public:
   virtual void sem() override;
   virtual void sem2() override;
   virtual void printOn(std::ostream &out) const override;
-  virtual Value *compile() const override;
-  virtual Value *compile2() const override;
+  virtual void compile() const override;
+  virtual void compile2() const override;
 
 private:
   std::string id;
@@ -852,7 +857,7 @@ public:
       : id(s), expr_vec(e), typ(t) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
-  virtual Value *compile() const override;
+  virtual void compile() const override;
 
 private:
   std::string id;
@@ -866,7 +871,7 @@ public:
   LetDef(bool b, std::vector<Def *> *v) : rec(b), def_vec(v) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
-  virtual Value *compile() const override;
+  virtual void compile() const override;
 
 private:
   bool rec;

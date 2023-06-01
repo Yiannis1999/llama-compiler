@@ -13,7 +13,7 @@ llvm::Type *AST::i8;
 llvm::Type *AST::i32;
 llvm::Type *AST::i64;
 llvm::Type *AST::flo;
-llvm::Type *AST::voi;
+llvm::StructType *AST::voi;
 
 void Program::llvm_compile_and_dump(bool optimize = false)
 {
@@ -36,7 +36,7 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   i32 = IntegerType::get(TheContext, 32);
   i64 = IntegerType::get(TheContext, 64);
   flo = llvm::Type::getFloatTy(TheContext);
-  voi = llvm::Type::getVoidTy(TheContext);
+  voi = llvm::StructType::create(TheContext, {}, "void");
 
   // Initialize pow
   FunctionType *pow_type = FunctionType::get(flo, {flo, flo}, false);
@@ -55,13 +55,13 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   Function::Create(print_string_type, Function::ExternalLinkage, str_print_string, TheModule.get());
 
   // Initialize Read Functions
-  FunctionType *read_int_type = FunctionType::get(i64, {}, false);
+  FunctionType *read_int_type = FunctionType::get(i64, {voi}, false);
   Function::Create(read_int_type, Function::ExternalLinkage, str_read_int, TheModule.get());
-  FunctionType *read_bool_type = FunctionType::get(i1, {}, false);
+  FunctionType *read_bool_type = FunctionType::get(i1, {voi}, false);
   Function::Create(read_bool_type, Function::ExternalLinkage, str_read_bool, TheModule.get());
-  FunctionType *read_char_type = FunctionType::get(i8, {}, false);
+  FunctionType *read_char_type = FunctionType::get(i8, {voi}, false);
   Function::Create(read_char_type, Function::ExternalLinkage, str_read_char, TheModule.get());
-  FunctionType *read_float_type = FunctionType::get(flo, {}, false);
+  FunctionType *read_float_type = FunctionType::get(flo, {voi}, false);
   Function::Create(read_float_type, Function::ExternalLinkage, str_read_float, TheModule.get());
   FunctionType *read_string_type = FunctionType::get(voi, {PointerType::get(i8, 0)}, false);
   Function::Create(read_string_type, Function::ExternalLinkage, str_read_string, TheModule.get());
@@ -85,7 +85,7 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   Function::Create(exp_type, Function::ExternalLinkage, str_exp, TheModule.get());
   FunctionType *ln_type = FunctionType::get(flo, {flo}, false);
   Function::Create(ln_type, Function::ExternalLinkage, str_ln, TheModule.get());
-  FunctionType *pi_type = FunctionType::get(flo, {}, false);
+  FunctionType *pi_type = FunctionType::get(flo, {voi}, false);
   Function::Create(pi_type, Function::ExternalLinkage, str_pi, TheModule.get());
 
   // Initialize incr decr
@@ -141,13 +141,12 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   TheModule->print(outs(), nullptr);
 }
 
-Value *Program::compile() const
+void Program::compile() const
 {
   for (Stmt *stmt : *statements)
   {
     stmt->compile();
   }
-  return nullptr;
 }
 
 llvm::Type *Type_Func::compile() const
@@ -162,14 +161,7 @@ llvm::Type *Type_Func::compile() const
   }
   for (::Type *t : tmp_vec)
   {
-    switch (t->get_type())
-    {
-    case type_unit:
-      break;
-    default:
-      from_vec.push_back(t->compile());
-      break;
-    }
+    from_vec.push_back(t->compile());
   }
   FunctionType *fn_type = FunctionType::get(tmp->compile(), from_vec, false);
   PointerType *fn_ptr_type = PointerType::getUnqual(fn_type);
@@ -181,7 +173,7 @@ llvm::Type *Type_Ref::compile() const
   return PointerType::get(typ->compile(), 0);
 }
 
-Value *LetDef::compile() const
+void LetDef::compile() const
 {
   for (Def *def : *def_vec)
   {
@@ -191,14 +183,12 @@ Value *LetDef::compile() const
   {
     def->compile2();
   }
-  return nullptr;
 }
 
-Value *NormalDef::compile() const
+void NormalDef::compile() const
 {
   if (par_vec->size() == 0) // constant
   {
-    if (typ->get_type() != type_unit)
     {
       llvm::Type *t = typ->compile();
       new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), id);
@@ -210,15 +200,8 @@ Value *NormalDef::compile() const
     for (Par *par : *par_vec)
     {
       llvm::Type *t = par->typ->compile();
-      switch (par->typ->get_type())
-      {
-      case type_unit:
-        break;
-      default:
-        from.push_back(t);
-        new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), par->id);
-        break;
-      }
+      from.push_back(t);
+      new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), par->id);
     }
     llvm::Type *to = typ->compile();
     FunctionType *fn_type = FunctionType::get(to, from, false);
@@ -237,19 +220,15 @@ Value *NormalDef::compile() const
     //   }
     // }
   }
-  return nullptr;
 }
 
-Value *NormalDef::compile2() const
+void NormalDef::compile2() const
 {
   if (par_vec->size() == 0) // constant
   {
     Value *v = expr->compile();
-    if (typ->get_type() != type_unit)
-    {
-      GlobalVariable *var = TheModule->getGlobalVariable(id, true);
-      Builder.CreateStore(v, var);
-    }
+    GlobalVariable *var = TheModule->getGlobalVariable(id, true);
+    Builder.CreateStore(v, var);
   }
   else // function
   {
@@ -260,54 +239,42 @@ Value *NormalDef::compile2() const
     Function::arg_iterator arg = func->arg_begin();
     for (Par *par : *par_vec)
     {
-      switch (par->typ->get_type())
-      {
-      case type_unit:
-        break;
-      default:
-        GlobalVariable *var = TheModule->getGlobalVariable(par->id, true);
-        Builder.CreateStore(arg, var);
-        std::advance(arg, 1);
-        break;
-      }
+      GlobalVariable *var = TheModule->getGlobalVariable(par->id, true);
+      Builder.CreateStore(arg, var);
+      std::advance(arg, 1);
     }
     Builder.CreateRet(expr->compile());
     Builder.SetInsertPoint(PrevBB);
   }
-  return nullptr;
 }
 
-Value *MutableDef::compile() const
+void MutableDef::compile() const
 {
-  if (typ->get_type() != type_unit)
+  std::vector<Value *> value_vec;
+  Value *size = c64(1);
+  if (expr_vec != nullptr)
   {
-    std::vector<Value *> value_vec;
-    Value *size = c64(1);
-    if (expr_vec != nullptr)
+    for (Expr *e : *expr_vec)
     {
-      for (Expr *e : *expr_vec)
-      {
-        Value *v = e->compile();
-        value_vec.push_back(v);
-        size = Builder.CreateMul(size, v);
-      }
-      size = Builder.CreateAdd(size, c64(8 * expr_vec->size()));
+      Value *v = e->compile();
+      value_vec.push_back(v);
+      size = Builder.CreateMul(size, v);
     }
-    llvm::Type *t = typ->compile();
-    llvm::Type *pt = PointerType::get(t, 0);
-    GlobalVariable *var = new GlobalVariable(*TheModule, pt, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(pt), id);
-    Value *alloc = Builder.CreateAlloca(t, size);
-    if (expr_vec != nullptr)
-    {
-      alloc = Builder.CreateGEP(alloc, {c64(8 * expr_vec->size())});
-      Value *ptr64 = Builder.CreateBitCast(alloc, PointerType::get(i64, 0));
-      int i = 0;
-      for (Value *v : value_vec)
-        Builder.CreateStore(v, Builder.CreateGEP(ptr64, {c64(--i)}));
-    }
-    Builder.CreateStore(alloc, var);
-  };
-  return nullptr;
+    size = Builder.CreateAdd(size, c64(8 * expr_vec->size()));
+  }
+  llvm::Type *t = typ->compile();
+  llvm::Type *pt = PointerType::get(t, 0);
+  GlobalVariable *var = new GlobalVariable(*TheModule, pt, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(pt), id);
+  Value *alloc = Builder.CreateAlloca(t, size);
+  if (expr_vec != nullptr)
+  {
+    alloc = Builder.CreateGEP(alloc, {c64(8 * expr_vec->size())});
+    Value *ptr64 = Builder.CreateBitCast(alloc, PointerType::get(i64, 0));
+    int i = 0;
+    for (Value *v : value_vec)
+      Builder.CreateStore(v, Builder.CreateGEP(ptr64, {c64(--i)}));
+  }
+  Builder.CreateStore(alloc, var);
 }
 
 Value *call::compile() const
@@ -315,8 +282,7 @@ Value *call::compile() const
   std::vector<Value *> value_vec;
   for (Expr *expr : *expr_vec)
   {
-    if (expr->typ->get_type() != type_unit)
-      value_vec.push_back(expr->compile());
+    value_vec.push_back(expr->compile());
   }
   Function *func = TheModule->getFunction(id);
   if (func == nullptr) // argument
@@ -329,19 +295,9 @@ Value *call::compile() const
         Value *fptr = arg;
         PointerType *fn_ptr_type = dyn_cast<PointerType>(arg->getType());
         FunctionType *fn_type = dyn_cast<FunctionType>(fn_ptr_type->getElementType());
-        if (typ->get_type() == type_unit)
-        {
-          Builder.CreateCall(fn_type, fptr, value_vec);
-          return nullptr;
-        }
         return Builder.CreateCall(fn_type, fptr, value_vec, "calltmp");
       }
     }
-  }
-  if (typ->get_type() == type_unit)
-  {
-    Builder.CreateCall(func, value_vec);
-    return nullptr;
   }
   return Builder.CreateCall(func, value_vec, "calltmp");
 }
@@ -380,25 +336,26 @@ Value *Bool_Expr::compile() const
   return c1(boolean);
 }
 
+Value *Unit_Expr::compile() const
+{
+  return cvoid();
+}
+
 Value *Array::compile() const
 {
-  if (typ->getChild1()->get_type() != type_unit)
+  Value *ptr = Builder.CreateLoad(TheModule->getGlobalVariable(id, true));
+  Value *ptr64 = Builder.CreateBitCast(ptr, PointerType::get(i64, 0));
+  Value *offset = c64(0);
+  Value *coeff = c64(1);
+  int i = -expr_vec->size();
+  for (auto e = expr_vec->rbegin(); e != expr_vec->rend(); e++)
   {
-    Value *ptr = Builder.CreateLoad(TheModule->getGlobalVariable(id, true));
-    Value *ptr64 = Builder.CreateBitCast(ptr, PointerType::get(i64, 0));
-    Value *offset = c64(0);
-    Value *coeff = c64(1);
-    int i = -expr_vec->size();
-    for (auto e = expr_vec->rbegin(); e != expr_vec->rend(); e++)
-    {
-      Value *v = (*e)->compile();
-      offset = Builder.CreateAdd(offset, Builder.CreateMul(v, coeff));
-      Value *dim = Builder.CreateLoad(Builder.CreateGEP(ptr64, {c64(i++)}));
-      coeff = Builder.CreateMul(coeff, dim);
-    }
-    return Builder.CreateGEP(ptr, {offset}, id + "_ptr");
+    Value *v = (*e)->compile();
+    offset = Builder.CreateAdd(offset, Builder.CreateMul(v, coeff));
+    Value *dim = Builder.CreateLoad(Builder.CreateGEP(ptr64, {c64(i++)}));
+    coeff = Builder.CreateMul(coeff, dim);
   }
-  return nullptr;
+  return Builder.CreateGEP(ptr, {offset}, id + "_ptr");
 }
 
 Value *Dim::compile() const
@@ -441,7 +398,7 @@ Value *While::compile() const
   stmt->compile();
   Builder.CreateBr(LoopBB);
   Builder.SetInsertPoint(AfterBB);
-  return nullptr;
+  return cvoid();
 }
 
 Value *For::compile() const
@@ -472,7 +429,7 @@ Value *For::compile() const
   Builder.CreateStore(new_iter, var);
   Builder.CreateBr(LoopBB);
   Builder.SetInsertPoint(AfterBB);
-  return nullptr;
+  return cvoid();
 }
 
 Value *UnOp::compile() const
@@ -493,9 +450,9 @@ Value *UnOp::compile() const
   case unop_not:
     return Builder.CreateNot(v, "nottmp");
   case unop_delete:
-    return nullptr;
+    return cvoid();
   default:
-    return nullptr;
+    return cvoid();
   }
 }
 
@@ -564,17 +521,45 @@ Value *BinOp::compile() const
   case binop_pow:
     return Builder.CreateCall(TheModule->getFunction("powf"), {l, r}, "fpowtmp");
   case binop_struct_eq:
-    if (l->getType()->isFloatingPointTy())
+    switch (left->typ->get_type())
+    {
+    case type_unit:
+      return c1(true);
+    case type_float:
       return Builder.CreateFCmpOEQ(l, r, "eqtmp");
-    return Builder.CreateICmpEQ(l, r, "eqtmp");
+    default:
+      return Builder.CreateICmpEQ(l, r, "eqtmp");
+    }
   case binop_struct_ne:
-    if (l->getType()->isFloatingPointTy())
+    switch (left->typ->get_type())
+    {
+    case type_unit:
+      return c1(true);
+    case type_float:
       return Builder.CreateFCmpONE(l, r, "eqtmp");
-    return Builder.CreateICmpNE(l, r, "eqtmp");
+    default:
+      return Builder.CreateICmpNE(l, r, "eqtmp");
+    }
   case binop_phys_eq:
-    return Builder.CreateICmpEQ(Builder.CreateBitCast(l, i64), Builder.CreateBitCast(r, i64), "eqtmp");
+    switch (left->typ->get_type())
+    {
+    case type_unit:
+      return c1(true);
+    case type_float:
+      return Builder.CreateFCmpOEQ(l, r, "eqtmp");
+    default:
+      return Builder.CreateICmpEQ(l, r, "eqtmp");
+    }
   case binop_phys_ne:
-    return Builder.CreateICmpNE(Builder.CreateBitCast(l, i64), Builder.CreateBitCast(r, i64), "eqtmp");
+    switch (left->typ->get_type())
+    {
+    case type_unit:
+      return c1(true);
+    case type_float:
+      return Builder.CreateFCmpONE(l, r, "eqtmp");
+    default:
+      return Builder.CreateICmpNE(l, r, "eqtmp");
+    }
   case binop_l:
     if (l->getType()->isFloatingPointTy())
       return Builder.CreateFCmpOLT(l, r, "eqtmp");
@@ -593,11 +578,11 @@ Value *BinOp::compile() const
     return Builder.CreateICmpSGE(l, r, "eqtmp");
   case binop_assign:
     Builder.CreateStore(r, l);
-    return nullptr;
+    return cvoid();
   case binop_semicolon:
     return r;
   default:
-    return nullptr;
+    return cvoid();
   }
 }
 
@@ -614,14 +599,12 @@ Value *If::compile() const
   ThenBB = Builder.GetInsertBlock();
   Builder.CreateBr(AfterBB);
   Builder.SetInsertPoint(ElseBB);
-  Value *v3 = nullptr;
+  Value *v3 = cvoid();
   if (expr3 != nullptr)
     v3 = expr3->compile();
   ElseBB = Builder.GetInsertBlock();
   Builder.CreateBr(AfterBB);
   Builder.SetInsertPoint(AfterBB);
-  if (typ->get_type() == type_unit)
-    return nullptr;
   PHINode *phi = Builder.CreatePHI(typ->compile(), 2, "phi");
   phi->addIncoming(v2, ThenBB);
   phi->addIncoming(v3, ElseBB);
@@ -630,9 +613,7 @@ Value *If::compile() const
 
 Value *New::compile() const
 {
-  if (ty->get_type() != type_unit)
-    return Builder.CreateAlloca(ty->compile(), c64(1));
-  return nullptr;
+  return Builder.CreateAlloca(ty->compile(), c64(1));
 }
 
 Value *LetIn::compile() const
