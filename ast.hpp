@@ -759,9 +759,10 @@ private:
 class Clause : public AST
 {
 public:
-  Clause(Pattern *p1, Expr *e1) : par(p1), expr(e1) {}
+  Clause(Pattern *p1, Expr *e1) : pat(p1), expr(e1) {}
   virtual void printOn(std::ostream &out) const override;
-  Pattern *par;
+  virtual void sem() override;
+  Pattern *pat;
   Expr *expr;
 };
 

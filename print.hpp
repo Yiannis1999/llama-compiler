@@ -245,7 +245,7 @@ void Pattern_Call::printOn(std::ostream &out) const
 
 void Clause::printOn(std::ostream &out) const
 {
-  out << "Clause(" << *par << ", " << *expr << ")";
+  out << "Clause(" << *pat << ", " << *expr << ")";
 }
 
 // class Match

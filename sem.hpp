@@ -588,10 +588,6 @@ void Pattern_Call::sem()
   for (Pattern *p : *pattern_vec)
   {
     p->sem();
-    if (tmp->get_type() == type_undefined)
-    {
-      tmp->equals(new Type_Func(new Type_Undefined(), new Type_Undefined()));
-    }
     if (tmp->get_type() != type_func)
     {
       semanticError("Parameter number mismatch");
@@ -612,21 +608,26 @@ void Pattern_Call::sem()
 
 // class Clause
 
+void Clause::sem()
+{
+  pat->sem();
+  expr->sem();
+}
+
 // class Match
 
 void Match::sem()
 {
   expr->sem();
-  ::Type *typ = new Type_Undefined();
-  st.openScope();
+  typ = new Type_Undefined();
   for (Clause *cl : *vec)
   {
-    cl->par->sem();
-    expr->type_check(cl->par->typ);
-    cl->expr->sem();
+    st.openScope();
+    cl->sem();
+    expr->type_check(cl->pat->typ);
     cl->expr->type_check(typ);
+    st.closeScope();
   }
-  st.closeScope();
   typ = ((*vec)[0])->expr->typ;
 }
 
