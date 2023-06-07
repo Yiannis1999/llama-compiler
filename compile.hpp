@@ -173,6 +173,11 @@ llvm::Type *Type_Ref::compile() const
   return PointerType::get(typ->compile(), 0);
 }
 
+llvm::Type *Type_id::compile() const
+{
+  return nullptr;
+}
+
 void LetDef::compile() const
 {
   for (Def *def : *def_vec)
@@ -189,10 +194,8 @@ void NormalDef::compile() const
 {
   if (par_vec->size() == 0) // constant
   {
-    {
-      llvm::Type *t = typ->compile();
-      new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), id);
-    }
+    llvm::Type *t = typ->compile();
+    new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), id);
   }
   else // function
   {
@@ -380,6 +383,11 @@ Value *id_Expr::compile() const
     Value *fptr = ConstantExpr::getBitCast(func, fn_ptr_type);
     return fptr;
   }
+  return nullptr;
+}
+
+Value *Id_Expr::compile() const
+{
   return nullptr;
 }
 
@@ -614,6 +622,78 @@ Value *If::compile() const
 Value *New::compile() const
 {
   return Builder.CreateAlloca(ty->compile(), c64(1));
+}
+
+Value *Pattern_Int_Expr::compile(Value *v) const
+{
+  return Builder.CreateICmpEQ(v, c64(num), "pat_cond");
+}
+
+Value *Pattern_Float_Expr::compile(Value *v) const
+{
+  return Builder.CreateFCmpOEQ(v, cfloat(num), "pat_cond");
+}
+
+Value *Pattern_Char_Expr::compile(Value *v) const
+{
+  return Builder.CreateICmpEQ(v, c8(ch), "pat_cond");
+}
+
+Value *Pattern_Bool_Expr::compile(Value *v) const
+{
+  return Builder.CreateICmpEQ(v, c1(boolean), "pat_cond");
+}
+
+Value *Pattern_id::compile(Value *v) const
+{
+  llvm::Type *t = v->getType();
+  GlobalVariable *var = new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), id);
+  Builder.CreateStore(v, var);
+  return c1(true);
+}
+
+Value *Pattern_Id::compile(Value *v) const
+{
+  return nullptr;
+}
+
+Value *Pattern_Call::compile(Value *v) const
+{
+  return nullptr;
+}
+
+Value *Match::compile() const
+{
+  Value *v = expr->compile();
+  std::vector<Value *> value_vec;
+  std::vector<BasicBlock *> block_vec;
+  Function *TheFunction = Builder.GetInsertBlock()->getParent();
+  BasicBlock *ThenBB = nullptr;
+  BasicBlock *ElseBB = nullptr;
+  BasicBlock *AfterBB = BasicBlock::Create(TheContext, "endif", TheFunction);
+  for (Clause *cl : *vec)
+  {
+    ThenBB = BasicBlock::Create(TheContext, "then", TheFunction);
+    ElseBB = BasicBlock::Create(TheContext, "else", TheFunction);
+    Value *cond = cl->pat->compile(v);
+    Builder.CreateCondBr(cond, ThenBB, ElseBB);
+    Builder.SetInsertPoint(ThenBB);
+    value_vec.push_back(cl->expr->compile());
+    ThenBB = Builder.GetInsertBlock();
+    block_vec.push_back(ThenBB);
+    Builder.CreateBr(AfterBB);
+    Builder.SetInsertPoint(ElseBB);
+  }
+  std::string msg = "Runtime Error: No matching pattern found\n";
+  Builder.CreateCall(TheModule->getFunction("print_string_4"), {Builder.CreateGlobalStringPtr(msg)});
+  Builder.CreateRet(c64(1));
+  Builder.SetInsertPoint(AfterBB);
+  PHINode *phi = Builder.CreatePHI(typ->compile(), vec->size(), "phi");
+  for (size_t i = 0; i < vec->size(); i++)
+  {
+    phi->addIncoming(value_vec[i], block_vec[i]);
+  }
+  return phi;
 }
 
 Value *LetIn::compile() const

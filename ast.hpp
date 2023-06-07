@@ -295,6 +295,7 @@ public:
   virtual std::string get_id() override;
   virtual bool equals(::Type *other) override;
   virtual void sem() override;
+  virtual llvm::Type *compile() const override;
 
 private:
   std::string id;
@@ -522,6 +523,7 @@ public:
   Id_Expr(std::string s) : id(s) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile() const override;
 
 private:
   std::string id;
@@ -636,6 +638,7 @@ class Pattern : public AST
 {
 public:
   virtual void sem() {}
+  virtual Value *compile(Value *v) const { return nullptr; }
   ::Type *typ;
 };
 
@@ -645,6 +648,7 @@ public:
   Pattern_Int_Expr(int n) : num(n) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile(Value *v) const override;
 
 private:
   int num;
@@ -656,6 +660,7 @@ public:
   Pattern_Float_Expr(float n) : num(n) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile(Value *v) const override;
 
 private:
   float num;
@@ -705,6 +710,7 @@ public:
   }
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile(Value *v) const override;
 
 private:
   char ch;
@@ -716,6 +722,7 @@ public:
   Pattern_Bool_Expr(bool b) : boolean(b) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile(Value *v) const override;
 
 private:
   bool boolean;
@@ -727,6 +734,7 @@ public:
   Pattern_id(std::string s) : id(s) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile(Value *v) const override;
 
 private:
   std::string id;
@@ -738,6 +746,7 @@ public:
   Pattern_Id(std::string s) : id(s) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile(Value *v) const override;
 
 private:
   std::string id;
@@ -750,6 +759,7 @@ public:
       : id(s), pattern_vec(v) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile(Value *v) const override;
 
 private:
   std::string id;
@@ -772,6 +782,7 @@ public:
   Match(Expr *e1, std::vector<Clause *> *v) : expr(e1), vec(v) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
+  virtual Value *compile() const override;
 
 private:
   Expr *expr;
@@ -837,7 +848,6 @@ class NormalDef : public Def
 public:
   NormalDef(std::string s, std::vector<Par *> *v, ::Type *t, Expr *e)
       : id(s), par_vec(v), typ(t), expr(e) {}
-
   virtual void sem() override;
   virtual void sem2() override;
   virtual void printOn(std::ostream &out) const override;

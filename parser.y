@@ -3,6 +3,7 @@
 #include "ast.hpp"
 #include "lexer.hpp"
 
+Program *prog;
 SymbolTable st;
 //ConstrTable ct;
 TypeDefTable tt;
@@ -142,9 +143,7 @@ TypeDefTable tt;
 program:
   stmt_list {
     $$ = new Program($1);
-    $$->sem();
-    // std::cout << *$$;
-    $$->llvm_compile_and_dump(false);
+    prog = $$;
    }
 ;
 
@@ -362,5 +361,10 @@ void yyerror(const char *msg) {
 
 int main() {
   int result = yyparse();
-  return result;
+  if (result != 0)
+    return result;
+  prog->sem();
+  // std::cout << *prog;
+  prog->llvm_compile_and_dump(false);
+  return 0;
 }
