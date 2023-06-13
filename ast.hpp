@@ -520,13 +520,13 @@ private:
 class Id_Expr : public Expr
 {
 public:
-  Id_Expr(std::string s) : id(s) {}
+  Id_Expr(std::string s) : Id(s) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   virtual Value *compile() const override;
 
 private:
-  std::string id;
+  std::string Id;
 };
 
 class While : public Expr
@@ -743,26 +743,26 @@ private:
 class Pattern_Id : public Pattern
 {
 public:
-  Pattern_Id(std::string s) : id(s) {}
+  Pattern_Id(std::string s) : Id(s) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   virtual Value *compile(Value *v) const override;
 
 private:
-  std::string id;
+  std::string Id;
 };
 
 class Pattern_Call : public Pattern
 {
 public:
   Pattern_Call(std::string s, std::vector<Pattern *> *v)
-      : id(s), pattern_vec(v) {}
+      : Id(s), pattern_vec(v) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   virtual Value *compile(Value *v) const override;
 
 private:
-  std::string id;
+  std::string Id;
   std::vector<Pattern *> *pattern_vec;
 };
 
@@ -795,6 +795,7 @@ public:
   Constr(std::string s, std::vector<::Type *> *v) : Id(s), type_vec(v) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem(std::string id);
+  virtual void compile() const;
 
 private:
   std::string Id;
@@ -818,6 +819,7 @@ public:
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   virtual void sem2();
+  virtual void compile() const;
 
 private:
   std::string id;
@@ -830,6 +832,7 @@ public:
   TypeDef(std::vector<TDef *> *v) : tdef_vec(v) {}
   virtual void sem() override;
   virtual void printOn(std::ostream &out) const override;
+  virtual void compile() const override;
 
 private:
   std::vector<TDef *> *tdef_vec;

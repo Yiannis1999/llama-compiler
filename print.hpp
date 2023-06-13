@@ -138,7 +138,7 @@ void id_Expr::printOn(std::ostream &out) const { out << "id(" << id << ")"; }
 
 // class Id
 
-void Id_Expr::printOn(std::ostream &out) const { out << "Id(" << id << ")"; }
+void Id_Expr::printOn(std::ostream &out) const { out << "Id(" << Id << ")"; }
 
 // class While
 
@@ -231,14 +231,14 @@ void Pattern_id::printOn(std::ostream &out) const
 
 void Pattern_Id::printOn(std::ostream &out) const
 {
-  out << "Pattern_Id(" << id << ")";
+  out << "Pattern_Id(" << Id << ")";
 }
 
 // class Pattern_Call
 
 void Pattern_Call::printOn(std::ostream &out) const
 {
-  out << "Pattern_Call(" << id << ", (" << *pattern_vec << "))";
+  out << "Pattern_Call(" << Id << ", (" << *pattern_vec << "))";
 }
 
 // class Clause

@@ -338,7 +338,7 @@ void id_Expr::sem() { typ = st.lookup(id)->type; }
 
 // class Id
 
-void Id_Expr::sem() { typ = st.lookup(id)->type; }
+void Id_Expr::sem() { typ = st.lookup(Id)->type; }
 
 // class While
 
@@ -577,14 +577,14 @@ void Pattern_id::sem()
 
 void Pattern_Id::sem()
 {
-  typ = st.lookup(id)->type;
+  typ = st.lookup(Id)->type;
 }
 
 // class Pattern_Call
 
 void Pattern_Call::sem()
 {
-  ::Type *tmp = st.lookup(id)->type;
+  ::Type *tmp = st.lookup(Id)->type;
   for (Pattern *p : *pattern_vec)
   {
     p->sem();

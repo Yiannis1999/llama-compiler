@@ -13,7 +13,7 @@ llvm::Type *AST::i8;
 llvm::Type *AST::i32;
 llvm::Type *AST::i64;
 llvm::Type *AST::flo;
-llvm::StructType *AST::voi;
+StructType *AST::voi;
 
 void Program::llvm_compile_and_dump(bool optimize = false)
 {
@@ -36,7 +36,11 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   i32 = IntegerType::get(TheContext, 32);
   i64 = IntegerType::get(TheContext, 64);
   flo = llvm::Type::getFloatTy(TheContext);
-  voi = llvm::StructType::create(TheContext, {}, "void");
+  voi = StructType::create(TheContext, {}, "void");
+
+  // Initialize exit
+  FunctionType *exit_type = FunctionType::get(voi, {i64}, false);
+  Function::Create(exit_type, Function::ExternalLinkage, "exit", TheModule.get());
 
   // Initialize pow
   FunctionType *pow_type = FunctionType::get(flo, {flo, flo}, false);
@@ -175,109 +179,7 @@ llvm::Type *Type_Ref::compile() const
 
 llvm::Type *Type_id::compile() const
 {
-  return nullptr;
-}
-
-void LetDef::compile() const
-{
-  for (Def *def : *def_vec)
-  {
-    def->compile();
-  }
-  for (Def *def : *def_vec)
-  {
-    def->compile2();
-  }
-}
-
-void NormalDef::compile() const
-{
-  if (par_vec->size() == 0) // constant
-  {
-    llvm::Type *t = typ->compile();
-    new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), id);
-  }
-  else // function
-  {
-    std::vector<llvm::Type *> from = {};
-    for (Par *par : *par_vec)
-    {
-      llvm::Type *t = par->typ->compile();
-      from.push_back(t);
-      new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), par->id);
-    }
-    llvm::Type *to = typ->compile();
-    FunctionType *fn_type = FunctionType::get(to, from, false);
-    Function::Create(fn_type, Function::ExternalLinkage, id, TheModule.get());
-    // Function::arg_iterator arg = func->arg_begin();
-    // for (Par *par : *par_vec)
-    // {
-    //   switch (par->typ->get_type())
-    //   {
-    //   case type_unit:
-    //     break;
-    //   default:
-    //     arg->setName(par->id);
-    //     std::advance(arg, 1);
-    //     break;
-    //   }
-    // }
-  }
-}
-
-void NormalDef::compile2() const
-{
-  if (par_vec->size() == 0) // constant
-  {
-    Value *v = expr->compile();
-    GlobalVariable *var = TheModule->getGlobalVariable(id, true);
-    Builder.CreateStore(v, var);
-  }
-  else // function
-  {
-    Function *func = TheModule->getFunction(id);
-    BasicBlock *PrevBB = Builder.GetInsertBlock();
-    BasicBlock *BodyBB = BasicBlock::Create(TheContext, id, func);
-    Builder.SetInsertPoint(BodyBB);
-    Function::arg_iterator arg = func->arg_begin();
-    for (Par *par : *par_vec)
-    {
-      GlobalVariable *var = TheModule->getGlobalVariable(par->id, true);
-      Builder.CreateStore(arg, var);
-      std::advance(arg, 1);
-    }
-    Builder.CreateRet(expr->compile());
-    Builder.SetInsertPoint(PrevBB);
-  }
-}
-
-void MutableDef::compile() const
-{
-  std::vector<Value *> value_vec;
-  Value *size = c64(1);
-  if (expr_vec != nullptr)
-  {
-    for (Expr *e : *expr_vec)
-    {
-      Value *v = e->compile();
-      value_vec.push_back(v);
-      size = Builder.CreateMul(size, v);
-    }
-    size = Builder.CreateAdd(size, c64(8 * expr_vec->size()));
-  }
-  llvm::Type *t = typ->compile();
-  llvm::Type *pt = PointerType::get(t, 0);
-  GlobalVariable *var = new GlobalVariable(*TheModule, pt, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(pt), id);
-  Value *alloc = Builder.CreateAlloca(t, size);
-  if (expr_vec != nullptr)
-  {
-    alloc = Builder.CreateGEP(alloc, {c64(8 * expr_vec->size())});
-    Value *ptr64 = Builder.CreateBitCast(alloc, PointerType::get(i64, 0));
-    int i = 0;
-    for (Value *v : value_vec)
-      Builder.CreateStore(v, Builder.CreateGEP(ptr64, {c64(--i)}));
-  }
-  Builder.CreateStore(alloc, var);
+  return PointerType::get(i64, 0);
 }
 
 Value *call::compile() const
@@ -388,7 +290,27 @@ Value *id_Expr::compile() const
 
 Value *Id_Expr::compile() const
 {
-  return nullptr;
+  std::string str = "";
+  for (auto it = Id.rbegin(); it != Id.rend(); ++it)
+  {
+    if (*it == '_')
+      break;
+    str = *it + str;
+  }
+  int num = stoi(str);
+  StructType *t = nullptr;
+  for (auto &structType : TheModule->getIdentifiedStructTypes())
+  {
+    if (structType->getName() == Id)
+    {
+      t = structType;
+      break;
+    }
+  }
+  Value *alloc = Builder.CreateAlloca(t, c64(1));
+  Value *MemberPointer = Builder.CreateStructGEP(t, alloc, 0);
+  Builder.CreateStore(c64(num), MemberPointer);
+  return Builder.CreateBitCast(alloc, PointerType::get(i64, 0));
 }
 
 Value *While::compile() const
@@ -483,7 +405,7 @@ Value *BinOp::compile() const
     Builder.SetInsertPoint(AfterBB);
     PHINode *phi = Builder.CreatePHI(typ->compile(), 2, "phi");
     phi->addIncoming(r, ThenBB);
-    phi->addIncoming(l, ElseBB);
+    phi->addIncoming(c1(false), ElseBB);
     return phi;
   }
   if (op == binop_or)
@@ -501,7 +423,7 @@ Value *BinOp::compile() const
     Builder.CreateBr(AfterBB);
     Builder.SetInsertPoint(AfterBB);
     PHINode *phi = Builder.CreatePHI(typ->compile(), 2, "phi");
-    phi->addIncoming(l, ThenBB);
+    phi->addIncoming(c1(true), ThenBB);
     phi->addIncoming(r, ElseBB);
     return phi;
   }
@@ -654,7 +576,15 @@ Value *Pattern_id::compile(Value *v) const
 
 Value *Pattern_Id::compile(Value *v) const
 {
-  return nullptr;
+  std::string str = "";
+  for (auto it = Id.rbegin(); it != Id.rend(); ++it)
+  {
+    if (*it == '_')
+      break;
+    str = *it + str;
+  }
+  int num = stoi(str);
+  return Builder.CreateICmpEQ(Builder.CreateLoad(v), c64(num), "pat_cond");
 }
 
 Value *Pattern_Call::compile(Value *v) const
@@ -686,7 +616,8 @@ Value *Match::compile() const
   }
   std::string msg = "Runtime Error: No matching pattern found\n";
   Builder.CreateCall(TheModule->getFunction("print_string_4"), {Builder.CreateGlobalStringPtr(msg)});
-  Builder.CreateRet(c64(1));
+  Builder.CreateCall(TheModule->getFunction("exit"), {c64(1)});
+  Builder.CreateBr(ElseBB);
   Builder.SetInsertPoint(AfterBB);
   PHINode *phi = Builder.CreatePHI(typ->compile(), vec->size(), "phi");
   for (size_t i = 0; i < vec->size(); i++)
@@ -694,6 +625,122 @@ Value *Match::compile() const
     phi->addIncoming(value_vec[i], block_vec[i]);
   }
   return phi;
+}
+
+void Constr::compile() const
+{
+  std::vector<llvm::Type *> members = {i64};
+  for (::Type *typ : *type_vec)
+  {
+    members.push_back(typ->compile());
+  }
+  llvm::Type *t = StructType::create(TheContext, {members}, Id);
+  new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), "dummy_" + Id);
+}
+
+void TDef::compile() const
+{
+  for (Constr *constr : *constr_vec)
+  {
+    constr->compile();
+  }
+}
+
+void TypeDef::compile() const
+{
+  for (TDef *tdef : *tdef_vec)
+  {
+    tdef->compile();
+  }
+}
+
+void NormalDef::compile() const
+{
+  if (par_vec->size() == 0) // constant
+  {
+    llvm::Type *t = typ->compile();
+    new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), id);
+  }
+  else // function
+  {
+    std::vector<llvm::Type *> from = {};
+    for (Par *par : *par_vec)
+    {
+      llvm::Type *t = par->typ->compile();
+      from.push_back(t);
+      new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), par->id);
+    }
+    llvm::Type *to = typ->compile();
+    FunctionType *fn_type = FunctionType::get(to, from, false);
+    Function::Create(fn_type, Function::ExternalLinkage, id, TheModule.get());
+  }
+}
+
+void NormalDef::compile2() const
+{
+  if (par_vec->size() == 0) // constant
+  {
+    Value *v = expr->compile();
+    GlobalVariable *var = TheModule->getGlobalVariable(id, true);
+    Builder.CreateStore(v, var);
+  }
+  else // function
+  {
+    Function *func = TheModule->getFunction(id);
+    BasicBlock *PrevBB = Builder.GetInsertBlock();
+    BasicBlock *BodyBB = BasicBlock::Create(TheContext, id, func);
+    Builder.SetInsertPoint(BodyBB);
+    Function::arg_iterator arg = func->arg_begin();
+    for (Par *par : *par_vec)
+    {
+      GlobalVariable *var = TheModule->getGlobalVariable(par->id, true);
+      Builder.CreateStore(arg, var);
+      std::advance(arg, 1);
+    }
+    Builder.CreateRet(expr->compile());
+    Builder.SetInsertPoint(PrevBB);
+  }
+}
+
+void MutableDef::compile() const
+{
+  std::vector<Value *> value_vec;
+  Value *size = c64(1);
+  if (expr_vec != nullptr)
+  {
+    for (Expr *e : *expr_vec)
+    {
+      Value *v = e->compile();
+      value_vec.push_back(v);
+      size = Builder.CreateMul(size, v);
+    }
+    size = Builder.CreateAdd(size, c64(8 * expr_vec->size()));
+  }
+  llvm::Type *t = typ->compile();
+  llvm::Type *pt = PointerType::get(t, 0);
+  GlobalVariable *var = new GlobalVariable(*TheModule, pt, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(pt), id);
+  Value *alloc = Builder.CreateAlloca(t, size);
+  if (expr_vec != nullptr)
+  {
+    alloc = Builder.CreateGEP(alloc, {c64(8 * expr_vec->size())});
+    Value *ptr64 = Builder.CreateBitCast(alloc, PointerType::get(i64, 0));
+    int i = 0;
+    for (Value *v : value_vec)
+      Builder.CreateStore(v, Builder.CreateGEP(ptr64, {c64(--i)}));
+  }
+  Builder.CreateStore(alloc, var);
+}
+
+void LetDef::compile() const
+{
+  for (Def *def : *def_vec)
+  {
+    def->compile();
+  }
+  for (Def *def : *def_vec)
+  {
+    def->compile2();
+  }
 }
 
 Value *LetIn::compile() const
