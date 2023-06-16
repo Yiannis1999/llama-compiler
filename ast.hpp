@@ -569,20 +569,6 @@ private:
   std::vector<Expr *> *expr_vec;
 };
 
-// class Call : public Expr
-// {
-// public:
-//   Call(std::string s, std::vector<Expr *> *v) : fun_name(s), expr_vec(v) {}
-//   virtual void printOn(std::ostream &out) const override
-//   {
-//     out << "Call(" << fun_name << ", (" << *expr_vec << "))";
-//   }
-
-// private:
-//   std::string fun_name;
-//   std::vector<Expr *> *expr_vec;
-// };
-
 class UnOp : public Expr
 {
 public:

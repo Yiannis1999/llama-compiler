@@ -334,7 +334,12 @@ void Dim::sem()
 
 // class id
 
-void id_Expr::sem() { typ = st.lookup(id)->type; }
+void id_Expr::sem()
+{
+  typ = st.lookup(id)->type;
+  if(typ->get_type() == type_func)
+    semanticError("Parameter number mismatch");
+}
 
 // class Id
 

@@ -38,6 +38,12 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   flo = llvm::Type::getFloatTy(TheContext);
   voi = StructType::create(TheContext, {}, "void");
 
+  // Initialize malloc
+  FunctionType *malloc_type = FunctionType::get(PointerType::get(i64, 0), {i64}, false);
+  Function::Create(malloc_type, Function::ExternalLinkage, "malloc", TheModule.get());
+  FunctionType *free_type = FunctionType::get(voi, {PointerType::get(i64, 0)}, false);
+  Function::Create(free_type, Function::ExternalLinkage, "free", TheModule.get());
+
   // Initialize exit
   FunctionType *exit_type = FunctionType::get(voi, {i64}, false);
   Function::Create(exit_type, Function::ExternalLinkage, "exit", TheModule.get());
@@ -290,27 +296,8 @@ Value *id_Expr::compile() const
 
 Value *Id_Expr::compile() const
 {
-  std::string str = "";
-  for (auto it = Id.rbegin(); it != Id.rend(); ++it)
-  {
-    if (*it == '_')
-      break;
-    str = *it + str;
-  }
-  int num = stoi(str);
-  StructType *t = nullptr;
-  for (auto &structType : TheModule->getIdentifiedStructTypes())
-  {
-    if (structType->getName() == Id)
-    {
-      t = structType;
-      break;
-    }
-  }
-  Value *alloc = Builder.CreateAlloca(t, c64(1));
-  Value *MemberPointer = Builder.CreateStructGEP(t, alloc, 0);
-  Builder.CreateStore(c64(num), MemberPointer);
-  return Builder.CreateBitCast(alloc, PointerType::get(i64, 0));
+  Function *func = TheModule->getFunction(Id);
+  return Builder.CreateCall(func, {}, "calltmp");
 }
 
 Value *While::compile() const
@@ -380,7 +367,8 @@ Value *UnOp::compile() const
   case unop_not:
     return Builder.CreateNot(v, "nottmp");
   case unop_delete:
-    return cvoid();
+    v = Builder.CreateBitCast(v, PointerType::get(i64, 0));
+    return Builder.CreateCall(TheModule->getFunction("free"), {v});
   default:
     return cvoid();
   }
@@ -466,9 +454,9 @@ Value *BinOp::compile() const
     case type_unit:
       return c1(true);
     case type_float:
-      return Builder.CreateFCmpONE(l, r, "eqtmp");
+      return Builder.CreateFCmpONE(l, r, "netmp");
     default:
-      return Builder.CreateICmpNE(l, r, "eqtmp");
+      return Builder.CreateICmpNE(l, r, "netmp");
     }
   case binop_phys_eq:
     switch (left->typ->get_type())
@@ -486,26 +474,26 @@ Value *BinOp::compile() const
     case type_unit:
       return c1(true);
     case type_float:
-      return Builder.CreateFCmpONE(l, r, "eqtmp");
+      return Builder.CreateFCmpONE(l, r, "netmp");
     default:
-      return Builder.CreateICmpNE(l, r, "eqtmp");
+      return Builder.CreateICmpNE(l, r, "netmp");
     }
   case binop_l:
     if (l->getType()->isFloatingPointTy())
-      return Builder.CreateFCmpOLT(l, r, "eqtmp");
-    return Builder.CreateICmpSLT(l, r, "eqtmp");
+      return Builder.CreateFCmpOLT(l, r, "lttmp");
+    return Builder.CreateICmpSLT(l, r, "lttmp");
   case binop_g:
     if (l->getType()->isFloatingPointTy())
-      return Builder.CreateFCmpOGT(l, r, "eqtmp");
-    return Builder.CreateICmpSGT(l, r, "eqtmp");
+      return Builder.CreateFCmpOGT(l, r, "gttmp");
+    return Builder.CreateICmpSGT(l, r, "gttmp");
   case binop_leq:
     if (l->getType()->isFloatingPointTy())
-      return Builder.CreateFCmpOLE(l, r, "eqtmp");
-    return Builder.CreateICmpSLE(l, r, "eqtmp");
+      return Builder.CreateFCmpOLE(l, r, "letmp");
+    return Builder.CreateICmpSLE(l, r, "letmp");
   case binop_geq:
     if (l->getType()->isFloatingPointTy())
-      return Builder.CreateFCmpOGE(l, r, "eqtmp");
-    return Builder.CreateICmpSGE(l, r, "eqtmp");
+      return Builder.CreateFCmpOGE(l, r, "getmp");
+    return Builder.CreateICmpSGE(l, r, "getmp");
   case binop_assign:
     Builder.CreateStore(r, l);
     return cvoid();
@@ -543,7 +531,12 @@ Value *If::compile() const
 
 Value *New::compile() const
 {
-  return Builder.CreateAlloca(ty->compile(), c64(1));
+  llvm::Type *t = ty->compile();
+  DataLayout dataLayout("");
+  Value *size = c64(dataLayout.getTypeSizeInBits(t) / 8);
+  Value *alloc = Builder.CreateCall(TheModule->getFunction("malloc"), {size});
+  Value *ptr = Builder.CreateBitCast(alloc, PointerType::get(t, 0));
+  return ptr;
 }
 
 Value *Pattern_Int_Expr::compile(Value *v) const
@@ -589,7 +582,47 @@ Value *Pattern_Id::compile(Value *v) const
 
 Value *Pattern_Call::compile(Value *v) const
 {
-  return nullptr;
+  std::string str = "";
+  for (auto it = Id.rbegin(); it != Id.rend(); ++it)
+  {
+    if (*it == '_')
+      break;
+    str = *it + str;
+  }
+  int num = stoi(str);
+  Value *cond = Builder.CreateICmpEQ(Builder.CreateLoad(v), c64(num), "pat_cond");
+  Function *TheFunction = Builder.GetInsertBlock()->getParent();
+  BasicBlock *ThenBB = BasicBlock::Create(TheContext, "then", TheFunction);
+  BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else", TheFunction);
+  BasicBlock *AfterBB = BasicBlock::Create(TheContext, "endif", TheFunction);
+  Builder.CreateCondBr(cond, ThenBB, ElseBB);
+  Builder.SetInsertPoint(ThenBB);
+  llvm::StructType *t = nullptr;
+  for (auto &structType : TheModule->getIdentifiedStructTypes())
+  {
+    if (structType->getName() == Id)
+    {
+      t = structType;
+      break;
+    }
+  }
+  Value *alloc = Builder.CreateBitCast(v, PointerType::get(t, 0));
+  int i = 1;
+  for (Pattern *pat : *pattern_vec)
+  {
+    llvm::Value *MemberPointer = Builder.CreateStructGEP(t, alloc, i);
+    cond = Builder.CreateAnd(cond, pat->compile(Builder.CreateLoad(MemberPointer)));
+    i++;
+  }
+  ThenBB = Builder.GetInsertBlock();
+  Builder.CreateBr(AfterBB);
+  Builder.SetInsertPoint(ElseBB);
+  Builder.CreateBr(AfterBB);
+  Builder.SetInsertPoint(AfterBB);
+  PHINode *phi = Builder.CreatePHI(i1, 2, "phi");
+  phi->addIncoming(cond, ThenBB);
+  phi->addIncoming(c1(false), ElseBB);
+  return phi;
 }
 
 Value *Match::compile() const
@@ -629,13 +662,43 @@ Value *Match::compile() const
 
 void Constr::compile() const
 {
+  std::string str = "";
+  for (auto it = Id.rbegin(); it != Id.rend(); ++it)
+  {
+    if (*it == '_')
+      break;
+    str = *it + str;
+  }
+  int num = stoi(str);
+  std::vector<llvm::Type *> from = {};
   std::vector<llvm::Type *> members = {i64};
   for (::Type *typ : *type_vec)
   {
-    members.push_back(typ->compile());
+    llvm::Type *t = typ->compile();
+    from.push_back(t);
+    members.push_back(t);
   }
   llvm::Type *t = StructType::create(TheContext, {members}, Id);
-  new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), "dummy_" + Id);
+  FunctionType *fn_type = FunctionType::get(PointerType::get(i64, 0), from, false);
+  Function *func = Function::Create(fn_type, Function::ExternalLinkage, Id, TheModule.get());
+  BasicBlock *PrevBB = Builder.GetInsertBlock();
+  BasicBlock *BodyBB = BasicBlock::Create(TheContext, Id, func);
+  Builder.SetInsertPoint(BodyBB);
+  DataLayout dataLayout("");
+  Value *size = c64(dataLayout.getTypeSizeInBits(t) / 8);
+  Value *alloc = Builder.CreateCall(TheModule->getFunction("malloc"), {size});
+  Value *ptr = Builder.CreateBitCast(alloc, PointerType::get(t, 0));
+  Value *MemberPointer = Builder.CreateStructGEP(t, ptr, 0);
+  Builder.CreateStore(c64(num), MemberPointer);
+  int i = 1;
+  for (Function::arg_iterator arg = func->arg_begin(); arg != func->arg_end(); arg++)
+  {
+    MemberPointer = Builder.CreateStructGEP(t, ptr, i);
+    Builder.CreateStore(arg, MemberPointer);
+    i++;
+  }
+  Builder.CreateRet(alloc);
+  Builder.SetInsertPoint(PrevBB);
 }
 
 void TDef::compile() const
@@ -704,8 +767,11 @@ void NormalDef::compile2() const
 
 void MutableDef::compile() const
 {
+  llvm::Type *t = typ->compile();
+  llvm::Type *pt = PointerType::get(t, 0);
   std::vector<Value *> value_vec;
-  Value *size = c64(1);
+  DataLayout dataLayout("");
+  Value *size = c64(dataLayout.getTypeSizeInBits(t) / 8);
   if (expr_vec != nullptr)
   {
     for (Expr *e : *expr_vec)
@@ -714,21 +780,19 @@ void MutableDef::compile() const
       value_vec.push_back(v);
       size = Builder.CreateMul(size, v);
     }
-    size = Builder.CreateAdd(size, c64(8 * expr_vec->size()));
+    size = Builder.CreateAdd(size, c64(expr_vec->size()));
   }
-  llvm::Type *t = typ->compile();
-  llvm::Type *pt = PointerType::get(t, 0);
   GlobalVariable *var = new GlobalVariable(*TheModule, pt, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(pt), id);
-  Value *alloc = Builder.CreateAlloca(t, size);
+  Value *alloc = Builder.CreateCall(TheModule->getFunction("malloc"), {size});
   if (expr_vec != nullptr)
   {
-    alloc = Builder.CreateGEP(alloc, {c64(8 * expr_vec->size())});
-    Value *ptr64 = Builder.CreateBitCast(alloc, PointerType::get(i64, 0));
+    alloc = Builder.CreateGEP(alloc, {c64(expr_vec->size())});
     int i = 0;
     for (Value *v : value_vec)
-      Builder.CreateStore(v, Builder.CreateGEP(ptr64, {c64(--i)}));
+      Builder.CreateStore(v, Builder.CreateGEP(alloc, {c64(--i)}));
   }
-  Builder.CreateStore(alloc, var);
+  Value *ptr = Builder.CreateBitCast(alloc, pt);
+  Builder.CreateStore(ptr, var);
 }
 
 void LetDef::compile() const
