@@ -760,7 +760,7 @@ void LetDef::sem()
 void LetIn::sem()
 {
   st.openScope();
-  def->sem();
+  letdef->sem();
   expr->sem();
   typ = expr->typ;
   st.closeScope();

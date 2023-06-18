@@ -322,5 +322,5 @@ void LetDef::printOn(std::ostream &out) const
 
 void LetIn::printOn(std::ostream &out) const
 {
-  out << "LetIn(" << *def << ", " << *expr << ")";
+  out << "LetIn(" << *letdef << ", " << *expr << ")";
 }

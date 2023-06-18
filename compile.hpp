@@ -322,6 +322,7 @@ Value *For::compile() const
 {
   GlobalVariable *var = new GlobalVariable(*TheModule, i64, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(i64), id);
   Builder.CreateStore(start->compile(), var);
+  Value *v = end->compile();
   BasicBlock *PrevBB = Builder.GetInsertBlock();
   Function *TheFunction = PrevBB->getParent();
   BasicBlock *LoopBB = BasicBlock::Create(TheContext, "loop", TheFunction);
@@ -332,9 +333,9 @@ Value *For::compile() const
   Value *iter = Builder.CreateLoad(var, "iter");
   Value *loop_cond;
   if (down)
-    loop_cond = Builder.CreateICmpSGE(iter, end->compile(), "loop_cond");
+    loop_cond = Builder.CreateICmpSGE(iter, v, "loop_cond");
   else
-    loop_cond = Builder.CreateICmpSLE(iter, end->compile(), "loop_cond");
+    loop_cond = Builder.CreateICmpSLE(iter, v, "loop_cond");
   Builder.CreateCondBr(loop_cond, BodyBB, AfterBB);
   Builder.SetInsertPoint(BodyBB);
   stmt->compile();
@@ -610,9 +611,8 @@ Value *Pattern_Call::compile(Value *v) const
   int i = 1;
   for (Pattern *pat : *pattern_vec)
   {
-    llvm::Value *MemberPointer = Builder.CreateStructGEP(t, alloc, i);
+    llvm::Value *MemberPointer = Builder.CreateStructGEP(t, alloc, i++);
     cond = Builder.CreateAnd(cond, pat->compile(Builder.CreateLoad(MemberPointer)));
-    i++;
   }
   ThenBB = Builder.GetInsertBlock();
   Builder.CreateBr(AfterBB);
@@ -693,9 +693,8 @@ void Constr::compile() const
   int i = 1;
   for (Function::arg_iterator arg = func->arg_begin(); arg != func->arg_end(); arg++)
   {
-    MemberPointer = Builder.CreateStructGEP(t, ptr, i);
+    MemberPointer = Builder.CreateStructGEP(t, ptr, i++);
     Builder.CreateStore(arg, MemberPointer);
-    i++;
   }
   Builder.CreateRet(alloc);
   Builder.SetInsertPoint(PrevBB);
@@ -749,18 +748,55 @@ void NormalDef::compile2() const
   }
   else // function
   {
+    std::vector<GlobalVariable *> global_vec;
+    std::vector<llvm::Type *> members;
+    auto start = std::prev(TheModule->global_end());
     Function *func = TheModule->getFunction(id);
     BasicBlock *PrevBB = Builder.GetInsertBlock();
-    BasicBlock *BodyBB = BasicBlock::Create(TheContext, id, func);
+    BasicBlock *HeadBB = BasicBlock::Create(TheContext, "head", func);
+    BasicBlock *BodyBB = BasicBlock::Create(TheContext, "body", func);
+    BasicBlock *TailBB = BasicBlock::Create(TheContext, "tail", func);
     Builder.SetInsertPoint(BodyBB);
     Function::arg_iterator arg = func->arg_begin();
     for (Par *par : *par_vec)
     {
       GlobalVariable *var = TheModule->getGlobalVariable(par->id, true);
-      Builder.CreateStore(arg, var);
-      std::advance(arg, 1);
+      Builder.CreateStore(arg++, var);
+      global_vec.push_back(var);
     }
-    Builder.CreateRet(expr->compile());
+    Value *v = expr->compile();
+    Builder.CreateBr(TailBB);
+    Builder.SetInsertPoint(HeadBB);
+    for (auto global = ++start; global != TheModule->global_end(); global++)
+    {
+      if (!global->isConstant())
+        global_vec.push_back(&*global);
+    }
+    for (GlobalVariable *global : global_vec)
+    {
+      members.push_back(global->getValueType());
+    }
+    llvm::Type *t = StructType::create(TheContext, {members}, id + "_bak");
+    DataLayout dataLayout("");
+    Value *size = c64(dataLayout.getTypeSizeInBits(t) / 8);
+    Value *alloc = Builder.CreateCall(TheModule->getFunction("malloc"), {size});
+    Value *ptr = Builder.CreateBitCast(alloc, PointerType::get(t, 0));
+    int i = 0;
+    for (GlobalVariable *global : global_vec)
+    {
+      Value *MemberPointer = Builder.CreateStructGEP(t, ptr, i++);
+      Builder.CreateStore(Builder.CreateLoad(global), MemberPointer);
+    }
+    Builder.CreateBr(BodyBB);
+    Builder.SetInsertPoint(TailBB);
+    i = 0;
+    for (GlobalVariable *global : global_vec)
+    {
+      Value *MemberPointer = Builder.CreateStructGEP(t, ptr, i++);
+      Builder.CreateStore(Builder.CreateLoad(MemberPointer), global);
+    }
+    Builder.CreateCall(TheModule->getFunction("free"), {alloc});
+    Builder.CreateRet(v);
     Builder.SetInsertPoint(PrevBB);
   }
 }
@@ -809,6 +845,6 @@ void LetDef::compile() const
 
 Value *LetIn::compile() const
 {
-  def->compile();
+  letdef->compile();
   return expr->compile();
 }

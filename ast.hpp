@@ -881,12 +881,12 @@ private:
 class LetIn : public Expr
 {
 public:
-  LetIn(LetDef *d, Expr *e) : def(d), expr(e) {}
+  LetIn(LetDef *d, Expr *e) : letdef(d), expr(e) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   virtual Value *compile() const override;
 
 private:
-  LetDef *def;
+  LetDef *letdef;
   Expr *expr;
 };
