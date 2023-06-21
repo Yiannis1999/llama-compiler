@@ -198,17 +198,11 @@ Value *call::compile() const
   Function *func = TheModule->getFunction(id);
   if (func == nullptr) // argument
   {
-    Function *f = Builder.GetInsertBlock()->getParent();
-    for (Function::arg_iterator arg = f->arg_begin(); arg != f->arg_end(); arg++)
-    {
-      if (arg->getName() == id)
-      {
-        Value *fptr = arg;
-        PointerType *fn_ptr_type = dyn_cast<PointerType>(arg->getType());
-        FunctionType *fn_type = dyn_cast<FunctionType>(fn_ptr_type->getElementType());
-        return Builder.CreateCall(fn_type, fptr, value_vec, "calltmp");
-      }
-    }
+    GlobalVariable *var = TheModule->getGlobalVariable(id, true);
+    Value *fptr = Builder.CreateLoad(var);
+    PointerType *fn_ptr_type = dyn_cast<PointerType>(fptr->getType());
+    FunctionType *fn_type = dyn_cast<FunctionType>(fn_ptr_type->getElementType());
+    return Builder.CreateCall(fn_type, fptr, value_vec, "calltmp");
   }
   return Builder.CreateCall(func, value_vec, "calltmp");
 }

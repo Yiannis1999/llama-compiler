@@ -337,8 +337,6 @@ void Dim::sem()
 void id_Expr::sem()
 {
   typ = st.lookup(id)->type;
-  if(typ->get_type() == type_func)
-    semanticError("Parameter number mismatch");
 }
 
 // class Id
@@ -386,11 +384,8 @@ void call::sem()
     {
       semanticError("Parameter number mismatch");
     }
-    else
-    {
-      e->type_check(tmp->getChild1());
-      tmp = tmp->getChild2();
-    }
+    e->type_check(tmp->getChild1());
+    tmp = tmp->getChild2();
   }
   if (tmp->get_type() == type_func)
   {
@@ -638,7 +633,7 @@ void Match::sem()
 
 // class Constr
 
-void Constr::sem(std::string id)
+void Constr::sem()
 {
   ::Type *tmp = new Type_id(id);
   for (auto i = type_vec->rbegin(); i != type_vec->rend(); i++)
@@ -662,7 +657,8 @@ void TDef::sem2()
 {
   for (Constr *c : *constr_vec)
   {
-    c->sem(id);
+    c->id = id;
+    c->sem();
   }
 }
 

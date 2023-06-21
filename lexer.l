@@ -21,7 +21,7 @@ D [0-9]
 W [ \t\r]
 HEX x[0-9A-Fa-f][0-9A-Fa-f]
 ESC_CHAR \\([ntr0\\\'\"]|{HEX})
-SIMPLE_CHAR [^\'\"\x00-\x19\x80-\xff]
+SIMPLE_CHAR [^\\\'\"\x00-\x19\x7f-\xff]
 CHAR {SIMPLE_CHAR}|{ESC_CHAR}
 
 %%

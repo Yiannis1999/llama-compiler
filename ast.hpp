@@ -780,8 +780,9 @@ class Constr : public AST
 public:
   Constr(std::string s, std::vector<::Type *> *v) : Id(s), type_vec(v) {}
   virtual void printOn(std::ostream &out) const override;
-  virtual void sem(std::string id);
+  virtual void sem() override;
   virtual void compile() const;
+  std::string id;
 
 private:
   std::string Id;
