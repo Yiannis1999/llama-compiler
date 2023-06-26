@@ -782,10 +782,9 @@ public:
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   virtual void compile() const;
-  std::string id;
+  std::string id, Id;
 
 private:
-  std::string Id;
   std::vector<::Type *> *type_vec;
 };
 
@@ -807,6 +806,7 @@ public:
   virtual void sem() override;
   virtual void sem2();
   virtual void compile() const;
+  virtual void compile2() const;
 
 private:
   std::string id;

@@ -372,6 +372,7 @@ Value *UnOp::compile() const
 Value *BinOp::compile() const
 {
   Value *l = left->compile();
+  ::Type *l_typ = left->typ;
   if (op == binop_and)
   {
     Function *TheFunction = Builder.GetInsertBlock()->getParent();
@@ -434,27 +435,43 @@ Value *BinOp::compile() const
   case binop_pow:
     return Builder.CreateCall(TheModule->getFunction("powf"), {l, r}, "fpowtmp");
   case binop_struct_eq:
-    switch (left->typ->get_type())
+    while (l_typ->get_type() == type_ref)
+    {
+      l_typ = l_typ->getChild1();
+      l = Builder.CreateLoad(l);
+      r = Builder.CreateLoad(r);
+    }
+    switch (l_typ->get_type())
     {
     case type_unit:
       return c1(true);
     case type_float:
       return Builder.CreateFCmpOEQ(l, r, "eqtmp");
+    case type_id:
+      return Builder.CreateCall(TheModule->getFunction(l_typ->get_id() + "_cmp"), {l, r}, "eqtmp");
     default:
       return Builder.CreateICmpEQ(l, r, "eqtmp");
     }
   case binop_struct_ne:
-    switch (left->typ->get_type())
+    while (l_typ->get_type() == type_ref)
+    {
+      l_typ = l_typ->getChild1();
+      l = Builder.CreateLoad(l);
+      r = Builder.CreateLoad(r);
+    }
+    switch (l_typ->get_type())
     {
     case type_unit:
       return c1(true);
     case type_float:
       return Builder.CreateFCmpONE(l, r, "netmp");
+    case type_id:
+      return Builder.CreateNot(Builder.CreateCall(TheModule->getFunction(l_typ->get_id() + "_cmp"), {l, r}), "netmp");
     default:
       return Builder.CreateICmpNE(l, r, "netmp");
     }
   case binop_phys_eq:
-    switch (left->typ->get_type())
+    switch (l_typ->get_type())
     {
     case type_unit:
       return c1(true);
@@ -464,7 +481,7 @@ Value *BinOp::compile() const
       return Builder.CreateICmpEQ(l, r, "eqtmp");
     }
   case binop_phys_ne:
-    switch (left->typ->get_type())
+    switch (l_typ->get_type())
     {
     case type_unit:
       return c1(true);
@@ -474,19 +491,19 @@ Value *BinOp::compile() const
       return Builder.CreateICmpNE(l, r, "netmp");
     }
   case binop_l:
-    if (l->getType()->isFloatingPointTy())
+    if (l_typ->get_type() == type_float)
       return Builder.CreateFCmpOLT(l, r, "lttmp");
     return Builder.CreateICmpSLT(l, r, "lttmp");
   case binop_g:
-    if (l->getType()->isFloatingPointTy())
+    if (l_typ->get_type() == type_float)
       return Builder.CreateFCmpOGT(l, r, "gttmp");
     return Builder.CreateICmpSGT(l, r, "gttmp");
   case binop_leq:
-    if (l->getType()->isFloatingPointTy())
+    if (l_typ->get_type() == type_float)
       return Builder.CreateFCmpOLE(l, r, "letmp");
     return Builder.CreateICmpSLE(l, r, "letmp");
   case binop_geq:
-    if (l->getType()->isFloatingPointTy())
+    if (l_typ->get_type() == type_float)
       return Builder.CreateFCmpOGE(l, r, "getmp");
     return Builder.CreateICmpSGE(l, r, "getmp");
   case binop_assign:
@@ -646,8 +663,8 @@ Value *Match::compile() const
   Builder.CreateCall(TheModule->getFunction("exit"), {c64(1)});
   Builder.CreateBr(ElseBB);
   Builder.SetInsertPoint(AfterBB);
-  PHINode *phi = Builder.CreatePHI(typ->compile(), vec->size(), "phi");
-  for (size_t i = 0; i < vec->size(); i++)
+  PHINode *phi = Builder.CreatePHI(typ->compile(), value_vec.size(), "phi");
+  for (size_t i = 0; i < value_vec.size(); i++)
   {
     phi->addIncoming(value_vec[i], block_vec[i]);
   }
@@ -673,10 +690,11 @@ void Constr::compile() const
     members.push_back(t);
   }
   llvm::Type *t = StructType::create(TheContext, {members}, Id);
+  // Constructor
   FunctionType *fn_type = FunctionType::get(PointerType::get(i64, 0), from, false);
   Function *func = Function::Create(fn_type, Function::ExternalLinkage, Id, TheModule.get());
   BasicBlock *PrevBB = Builder.GetInsertBlock();
-  BasicBlock *BodyBB = BasicBlock::Create(TheContext, Id, func);
+  BasicBlock *BodyBB = BasicBlock::Create(TheContext, "body", func);
   Builder.SetInsertPoint(BodyBB);
   DataLayout dataLayout("");
   Value *size = c64(dataLayout.getTypeSizeInBits(t) / 8);
@@ -691,15 +709,101 @@ void Constr::compile() const
     Builder.CreateStore(arg, MemberPointer);
   }
   Builder.CreateRet(alloc);
+  // Comparator
+  fn_type = FunctionType::get(i1, {PointerType::get(i64, 0), PointerType::get(i64, 0)}, false);
+  func = Function::Create(fn_type, Function::ExternalLinkage, Id + "_cmp", TheModule.get());
+  BodyBB = BasicBlock::Create(TheContext, "body", func);
+  Builder.SetInsertPoint(BodyBB);
+  Function::arg_iterator arg = func->arg_begin();
+  Value *l_ptr = Builder.CreateBitCast(arg++, PointerType::get(t, 0));
+  Value *r_ptr = Builder.CreateBitCast(arg, PointerType::get(t, 0));
+  Value *cond = c1(true);
+  i = 1;
+  for (::Type *typ : *type_vec)
+  {
+    Value *l = Builder.CreateLoad(Builder.CreateStructGEP(t, l_ptr, i));
+    Value *r = Builder.CreateLoad(Builder.CreateStructGEP(t, r_ptr, i++));
+    while (typ->get_type() == type_ref)
+    {
+      typ = typ->getChild1();
+      l = Builder.CreateLoad(l);
+      r = Builder.CreateLoad(r);
+    }
+    switch (typ->get_type())
+    {
+    case type_unit:
+      continue;
+    case type_float:
+      cond = Builder.CreateAnd(cond, Builder.CreateFCmpOEQ(l, r));
+      continue;
+    case type_id:
+      cond = Builder.CreateAnd(cond, Builder.CreateCall(TheModule->getFunction(typ->get_id() + "_cmp"), {l, r}));
+      continue;
+    default:
+      cond = Builder.CreateAnd(cond, Builder.CreateICmpEQ(l, r));
+      continue;
+    }
+  }
+  Builder.CreateRet(cond);
   Builder.SetInsertPoint(PrevBB);
 }
 
 void TDef::compile() const
 {
+  FunctionType *fn_type = FunctionType::get(i1, {PointerType::get(i64, 0), PointerType::get(i64, 0)}, false);
+  Function::Create(fn_type, Function::ExternalLinkage, id + "_cmp", TheModule.get());
+}
+
+void TDef::compile2() const
+{
+  Function *func = TheModule->getFunction(id + "_cmp");
+  std::vector<Value *> value_vec;
+  std::vector<BasicBlock *> block_vec;
+  BasicBlock *PrevBB = Builder.GetInsertBlock();
+  BasicBlock *HeadBB = BasicBlock::Create(TheContext, "head", func);
+  BasicBlock *BodyBB = BasicBlock::Create(TheContext, "body", func);
+  BasicBlock *ThenBB = nullptr;
+  BasicBlock *ElseBB = nullptr;
+  BasicBlock *AfterBB = BasicBlock::Create(TheContext, "endif", func);
+  Builder.SetInsertPoint(BodyBB);
+  Function::arg_iterator arg = func->arg_begin();
+  Value *l_ptr = arg++;
+  Value *r_ptr = arg;
   for (Constr *constr : *constr_vec)
   {
     constr->compile();
+    std::string str = "";
+    for (auto it = constr->Id.rbegin(); it != constr->Id.rend(); ++it)
+    {
+      if (*it == '_')
+        break;
+      str = *it + str;
+    }
+    int num = stoi(str);
+    ThenBB = BasicBlock::Create(TheContext, "then", func);
+    ElseBB = BasicBlock::Create(TheContext, "else", func);
+    Value *cond = Builder.CreateICmpEQ(Builder.CreateLoad(l_ptr), c64(num));
+    Builder.CreateCondBr(cond, ThenBB, ElseBB);
+    Builder.SetInsertPoint(ThenBB);
+    value_vec.push_back(Builder.CreateCall(TheModule->getFunction(constr->Id + "_cmp"), {l_ptr, r_ptr}));
+    block_vec.push_back(ThenBB);
+    Builder.CreateBr(AfterBB);
+    Builder.SetInsertPoint(ElseBB);
   }
+  value_vec.push_back(c1(false));
+  block_vec.push_back(ElseBB);
+  Builder.CreateBr(AfterBB);
+  Builder.SetInsertPoint(HeadBB);
+  Value *cond = Builder.CreateICmpEQ(Builder.CreateLoad(l_ptr), Builder.CreateLoad(r_ptr));
+  Builder.CreateCondBr(cond, BodyBB, ElseBB);
+  Builder.SetInsertPoint(AfterBB);
+  PHINode *phi = Builder.CreatePHI(i1, value_vec.size());
+  for (size_t i = 0; i < value_vec.size(); i++)
+  {
+    phi->addIncoming(value_vec[i], block_vec[i]);
+  }
+  Builder.CreateRet(phi);
+  Builder.SetInsertPoint(PrevBB);
 }
 
 void TypeDef::compile() const
@@ -707,6 +811,10 @@ void TypeDef::compile() const
   for (TDef *tdef : *tdef_vec)
   {
     tdef->compile();
+  }
+  for (TDef *tdef : *tdef_vec)
+  {
+    tdef->compile2();
   }
 }
 
