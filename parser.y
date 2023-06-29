@@ -5,7 +5,6 @@
 
 Program *prog;
 SymbolTable st;
-//ConstrTable ct;
 TypeDefTable tt;
 %}
 
@@ -354,17 +353,91 @@ pattern_list:
 
 %%
 
-void yyerror(const char *msg) {
-  fprintf (stderr, "Error: %s\n", msg);
+void yyerror(const char *msg)
+{
+  fprintf(stderr, "Error: %s\n", msg);
   exit(1);
 }
 
-int main() {
+int main(int argc, char *argv[])
+{
+  bool optimize = false;
+  bool intermediate = false;
+  bool final = false;
+  bool print = false;
+  std::string filename = "";
+  std::string name = "";
+  std::error_code error;
+  llvm::raw_fd_ostream *imm_file = nullptr, *asm_file = nullptr;
+  for (int i = 1; i < argc; ++i)
+  {
+    if (strcmp(argv[i], "-o") == 0)
+    {
+      optimize = true;
+    }
+    else if (strcmp(argv[i], "-f") == 0)
+    {
+      final = true;
+    }
+    else if (strcmp(argv[i], "-i") == 0)
+    {
+      intermediate = true;
+    }
+    else if (strcmp(argv[i], "-p") == 0)
+    {
+      print = true;
+    }
+    else
+    {
+      filename = argv[i];
+      name = filename.substr(0, filename.find_last_of('.'));
+    }
+  }
+  if (!intermediate && !final && !print)
+  {
+    if (filename == "")
+    {
+      std::cerr << "Usage: ./llama [-o] [-f | -i | -p]" << std::endl;
+      std::cerr << "Usage: ./llama [-o] <file>" << std::endl;
+      return 1;
+    }
+    FILE *file = freopen(filename.c_str(), "r", stdin);
+    if (file == nullptr)
+    {
+      std::cerr << "Failed to open the file" << std::endl;
+      return 1;
+    }
+    imm_file = new llvm::raw_fd_ostream(name + ".ll", error);
+    if (error)
+    {
+      llvm::errs() << "Error opening the file: " << error.message() << "\n";
+      return 1;
+    }
+    asm_file = new llvm::raw_fd_ostream(name + ".s", error);
+    if (error)
+    {
+      llvm::errs() << "Error opening the file: " << error.message() << "\n";
+      return 1;
+    }
+  }
+  if (intermediate)
+  {
+    imm_file = &llvm::outs();
+  }
+  if (final)
+  {
+    asm_file = &llvm::outs();
+  }
   int result = yyparse();
   if (result != 0)
+  {
     return result;
+  }
   prog->sem();
-  // std::cout << *prog;
-  prog->llvm_compile_and_dump(false);
+  if (print)
+  {
+    std::cout << *prog;
+  }
+  prog->llvm_compile_and_dump(optimize, imm_file, asm_file);
   return 0;
 }

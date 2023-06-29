@@ -15,6 +15,10 @@
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Scalar/GVN.h>
 #include <llvm/Transforms/Utils.h>
+#include <llvm/Support/Host.h>
+#include <llvm/Support/TargetRegistry.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Target/TargetMachine.h>
 
 using namespace llvm;
 
@@ -168,7 +172,7 @@ public:
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   virtual void compile() const;
-  void llvm_compile_and_dump(bool optimize);
+  void llvm_compile_and_dump(bool optimize, llvm::raw_fd_ostream* imm_file, llvm::raw_fd_ostream* asm_file);
 
 private:
   std::vector<Stmt *> *statements;

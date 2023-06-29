@@ -15,9 +15,9 @@ llvm::Type *AST::i64;
 llvm::Type *AST::flo;
 StructType *AST::voi;
 
-void Program::llvm_compile_and_dump(bool optimize = false)
+void Program::llvm_compile_and_dump(bool optimize, raw_fd_ostream *imm_file, raw_fd_ostream *asm_file)
 {
-  // Initialize
+  // Initialize the module and the optimization passes
   TheModule = std::make_unique<Module>("Llama program", TheContext);
   TheFPM = std::make_unique<legacy::FunctionPassManager>(TheModule.get());
   if (optimize)
@@ -29,7 +29,6 @@ void Program::llvm_compile_and_dump(bool optimize = false)
     TheFPM->add(createCFGSimplificationPass());
   }
   TheFPM->doInitialization();
-
   // Initialize types
   i1 = IntegerType::get(TheContext, 1);
   i8 = IntegerType::get(TheContext, 8);
@@ -37,21 +36,17 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   i64 = IntegerType::get(TheContext, 64);
   flo = llvm::Type::getFloatTy(TheContext);
   voi = StructType::create(TheContext, {}, "void");
-
   // Initialize malloc
   FunctionType *malloc_type = FunctionType::get(PointerType::get(i64, 0), {i64}, false);
   Function::Create(malloc_type, Function::ExternalLinkage, "malloc", TheModule.get());
   FunctionType *free_type = FunctionType::get(voi, {PointerType::get(i64, 0)}, false);
   Function::Create(free_type, Function::ExternalLinkage, "free", TheModule.get());
-
   // Initialize exit
   FunctionType *exit_type = FunctionType::get(voi, {i64}, false);
   Function::Create(exit_type, Function::ExternalLinkage, "exit", TheModule.get());
-
   // Initialize pow
   FunctionType *pow_type = FunctionType::get(flo, {flo, flo}, false);
   Function::Create(pow_type, Function::ExternalLinkage, "powf", TheModule.get());
-
   // Initialize Write Functions
   FunctionType *print_int_type = FunctionType::get(voi, {i64}, false);
   Function::Create(print_int_type, Function::ExternalLinkage, str_print_int, TheModule.get());
@@ -63,7 +58,6 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   Function::Create(print_float_type, Function::ExternalLinkage, str_print_float, TheModule.get());
   FunctionType *print_string_type = FunctionType::get(voi, {PointerType::get(i8, 0)}, false);
   Function::Create(print_string_type, Function::ExternalLinkage, str_print_string, TheModule.get());
-
   // Initialize Read Functions
   FunctionType *read_int_type = FunctionType::get(i64, {voi}, false);
   Function::Create(read_int_type, Function::ExternalLinkage, str_read_int, TheModule.get());
@@ -75,7 +69,6 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   Function::Create(read_float_type, Function::ExternalLinkage, str_read_float, TheModule.get());
   FunctionType *read_string_type = FunctionType::get(voi, {PointerType::get(i8, 0)}, false);
   Function::Create(read_string_type, Function::ExternalLinkage, str_read_string, TheModule.get());
-
   // Initialize Math Functions
   FunctionType *abs_type = FunctionType::get(i64, {i64}, false);
   Function::Create(abs_type, Function::ExternalLinkage, str_abs, TheModule.get());
@@ -97,13 +90,11 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   Function::Create(ln_type, Function::ExternalLinkage, str_ln, TheModule.get());
   FunctionType *pi_type = FunctionType::get(flo, {voi}, false);
   Function::Create(pi_type, Function::ExternalLinkage, str_pi, TheModule.get());
-
   // Initialize incr decr
   FunctionType *incr_type = FunctionType::get(voi, {PointerType::get(i64, 0)}, false);
   Function::Create(incr_type, Function::ExternalLinkage, str_incr, TheModule.get());
   FunctionType *decr_type = FunctionType::get(voi, {PointerType::get(i64, 0)}, false);
   Function::Create(decr_type, Function::ExternalLinkage, str_decr, TheModule.get());
-
   // Initialize Convertion Functions
   FunctionType *float_of_int_type = FunctionType::get(flo, {i64}, false);
   Function::Create(float_of_int_type, Function::ExternalLinkage, str_float_of_int, TheModule.get());
@@ -115,7 +106,6 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   Function::Create(int_of_char_type, Function::ExternalLinkage, str_int_of_char, TheModule.get());
   FunctionType *char_of_int_type = FunctionType::get(i8, {i64}, false);
   Function::Create(char_of_int_type, Function::ExternalLinkage, str_char_of_int, TheModule.get());
-
   // Initialize String Functions
   FunctionType *strlen_type = FunctionType::get(i64, {PointerType::get(i8, 0)}, false);
   Function::Create(strlen_type, Function::ExternalLinkage, str_strlen, TheModule.get());
@@ -125,16 +115,15 @@ void Program::llvm_compile_and_dump(bool optimize = false)
   Function::Create(strcpy_type, Function::ExternalLinkage, str_strcpy, TheModule.get());
   FunctionType *strcat_type = FunctionType::get(voi, {PointerType::get(i8, 0), PointerType::get(i8, 0)}, false);
   Function::Create(strcat_type, Function::ExternalLinkage, str_strcat, TheModule.get());
-
-  // Define and start the main function.
+  // Define and start the main function
   FunctionType *main_type = FunctionType::get(i64, {}, false);
   Function *main = Function::Create(main_type, Function::ExternalLinkage, "main", TheModule.get());
   BasicBlock *BB = BasicBlock::Create(TheContext, "entry", main);
   Builder.SetInsertPoint(BB);
-  // Emit the program code.
+  // Emit the program code
   compile();
   Builder.CreateRet(c64(0));
-  // Verify the IR.
+  // Verify the IR
   bool bad = verifyModule(*TheModule, &errs());
   if (bad)
   {
@@ -145,10 +134,42 @@ void Program::llvm_compile_and_dump(bool optimize = false)
     TheModule->print(errs(), nullptr);
     std::exit(1);
   }
-  // Optimize!
+  // Optimize
   TheFPM->run(*main);
-  // Print out the IR.
-  TheModule->print(outs(), nullptr);
+  if (imm_file != nullptr) // Print out the IR
+  {
+    TheModule->print(*imm_file, nullptr);
+  }
+  if (asm_file != nullptr) // Print out the Assembly
+  {
+    std::string TargetTriple = sys::getDefaultTargetTriple();
+    TheModule->setTargetTriple(TargetTriple);
+    InitializeAllTargets();
+    InitializeAllTargetMCs();
+    InitializeAllAsmPrinters();
+    InitializeAllAsmParsers();
+    std::string Error;
+    const Target *TheTarget = TargetRegistry::lookupTarget(TargetTriple, Error);
+    if (!TheTarget)
+    {
+      errs() << "Failed to get target: " << Error;
+      exit(1);
+    }
+    std::string CPU = "generic";
+    std::string Features = "";
+    TargetOptions opt;
+    Optional<Reloc::Model> RM = Optional<Reloc::Model>();
+    TargetMachine *TheTargetMachine = TheTarget->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+    TheModule->setDataLayout(TheTargetMachine->createDataLayout());
+    legacy::PassManager pass;
+    if (TheTargetMachine->addPassesToEmitFile(pass, *asm_file, nullptr, CGFT_AssemblyFile))
+    {
+      errs() << "TargetMachine can't emit a file of this type";
+      exit(1);
+    }
+    pass.run(*TheModule);
+    asm_file->flush();
+  }
 }
 
 void Program::compile() const
@@ -609,7 +630,7 @@ Value *Pattern_Call::compile(Value *v) const
   BasicBlock *AfterBB = BasicBlock::Create(TheContext, "endif", TheFunction);
   Builder.CreateCondBr(cond, ThenBB, ElseBB);
   Builder.SetInsertPoint(ThenBB);
-  llvm::StructType *t = nullptr;
+  StructType *t = nullptr;
   for (auto &structType : TheModule->getIdentifiedStructTypes())
   {
     if (structType->getName() == Id)
@@ -746,6 +767,7 @@ void Constr::compile() const
   }
   Builder.CreateRet(cond);
   Builder.SetInsertPoint(PrevBB);
+  TheFPM->run(*func);
 }
 
 void TDef::compile() const
@@ -804,6 +826,7 @@ void TDef::compile2() const
   }
   Builder.CreateRet(phi);
   Builder.SetInsertPoint(PrevBB);
+  TheFPM->run(*func);
 }
 
 void TypeDef::compile() const
@@ -900,6 +923,7 @@ void NormalDef::compile2() const
     Builder.CreateCall(TheModule->getFunction("free"), {alloc});
     Builder.CreateRet(v);
     Builder.SetInsertPoint(PrevBB);
+    TheFPM->run(*func);
   }
 }
 
