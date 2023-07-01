@@ -2,7 +2,9 @@ int strlen_27(char *str)
 {
     int len = 0;
     while (*str++ != '\0')
+    {
         len++;
+    }
     return len;
 }
 
@@ -11,7 +13,9 @@ int strcmp_28(char *str1, char *str2)
     while (*str1 == *str2)
     {
         if (*str1 == '\0')
+        {
             return 0;
+        }
         str1++;
         str2++;
     }

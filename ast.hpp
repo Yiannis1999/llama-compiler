@@ -6,7 +6,6 @@
 
 #include "symbol.hpp"
 
-// llvm includes
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Value.h>
@@ -112,42 +111,40 @@ protected:
   static std::string str_strcmp;
   static std::string str_strcpy;
   static std::string str_strcat;
-
+  // Global LLVM variables related to the LLVM suite
   static LLVMContext TheContext;
   static IRBuilder<> Builder;
   static std::unique_ptr<Module> TheModule;
   static std::unique_ptr<legacy::FunctionPassManager> TheFPM;
-
-  // Type Shortcuts
+  // Useful LLVM types
   static llvm::Type *i1;
   static llvm::Type *i8;
   static llvm::Type *i32;
   static llvm::Type *i64;
   static llvm::Type *flo;
   static llvm::StructType *voi;
-
-  // LLVM helper functions
-  static ConstantInt *c1(bool b)
+  // Useful LLVM helper functions
+  ConstantInt *c1(bool b) const
   {
     return ConstantInt::get(TheContext, APInt(1, b, true));
   }
-  static ConstantInt *c8(char c)
+  ConstantInt *c8(char c) const
   {
     return ConstantInt::get(TheContext, APInt(8, c, true));
   }
-  static ConstantInt *c32(int n)
+  ConstantInt *c32(int n) const
   {
     return ConstantInt::get(TheContext, APInt(32, n, true));
   }
-  static ConstantInt *c64(int n)
+  ConstantInt *c64(int n) const
   {
     return ConstantInt::get(TheContext, APInt(64, n, true));
   }
-  static Constant *cfloat(float f)
+  Constant *cfloat(float f) const
   {
     return ConstantFP::get(flo, f);
   }
-  static Constant *cvoid()
+  Constant *cvoid() const
   {
     return llvm::ConstantStruct::get(voi, {});
   }
@@ -162,7 +159,7 @@ inline std::ostream &operator<<(std::ostream &out, const AST &t)
 class Stmt : public AST
 {
 public:
-  virtual void compile() const {}
+  virtual void compile() const = 0;
 };
 
 class Program : public AST
@@ -172,7 +169,7 @@ public:
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   virtual void compile() const;
-  void llvm_compile_and_dump(bool optimize, llvm::raw_fd_ostream* imm_file, llvm::raw_fd_ostream* asm_file);
+  void llvm_compile_and_dump(bool optimize, llvm::raw_fd_ostream *imm_file, llvm::raw_fd_ostream *asm_file);
 
 private:
   std::vector<Stmt *> *statements;
@@ -181,20 +178,13 @@ private:
 class Type : public AST
 {
 public:
-  virtual main_type get_type() { return type_undefined; }
-  virtual ::Type *getChild1() { return nullptr; }
-  virtual ::Type *getChild2() { return nullptr; }
-  virtual int getDim() { return 0; }
-  virtual std::string get_id() { return ""; }
-  virtual bool equals(::Type *other)
-  {
-    if (other == nullptr)
-      return false;
-    if (other->get_type() == type_undefined)
-      return other->equals(this);
-    return this->get_type() == other->get_type();
-  }
-  virtual llvm::Type *compile() const { return nullptr; }
+  virtual main_type get_type() = 0;
+  virtual ::Type *getChild1();
+  virtual ::Type *getChild2();
+  virtual int getDim();
+  virtual std::string get_id();
+  virtual bool equals(::Type *other);
+  virtual llvm::Type *compile() const = 0;
 };
 
 class Type_Unit : public ::Type
@@ -203,7 +193,7 @@ public:
   Type_Unit() {}
   virtual void printOn(std::ostream &out) const override;
   virtual main_type get_type() override;
-  virtual llvm::Type *compile() const override { return voi; };
+  virtual llvm::Type *compile() const override;
 };
 
 class Type_Int : public ::Type
@@ -212,16 +202,7 @@ public:
   Type_Int() {}
   virtual void printOn(std::ostream &out) const override;
   virtual main_type get_type() override;
-  virtual llvm::Type *compile() const override { return i64; };
-};
-
-class Type_Float : public ::Type
-{
-public:
-  Type_Float() {}
-  virtual void printOn(std::ostream &out) const override;
-  virtual main_type get_type() override;
-  virtual llvm::Type *compile() const override { return flo; };
+  virtual llvm::Type *compile() const override;
 };
 
 class Type_Char : public ::Type
@@ -230,7 +211,7 @@ public:
   Type_Char() {}
   virtual void printOn(std::ostream &out) const override;
   virtual main_type get_type() override;
-  virtual llvm::Type *compile() const override { return i8; };
+  virtual llvm::Type *compile() const override;
 };
 
 class Type_Bool : public ::Type
@@ -239,7 +220,16 @@ public:
   Type_Bool() {}
   virtual void printOn(std::ostream &out) const override;
   virtual main_type get_type() override;
-  virtual llvm::Type *compile() const override { return i1; };
+  virtual llvm::Type *compile() const override;
+};
+
+class Type_Float : public ::Type
+{
+public:
+  Type_Float() {}
+  virtual void printOn(std::ostream &out) const override;
+  virtual main_type get_type() override;
+  virtual llvm::Type *compile() const override;
 };
 
 class Type_Func : public ::Type
@@ -276,14 +266,14 @@ private:
 class Type_Array : public ::Type
 {
 public:
-  Type_Array(int i, ::Type *t1) : dim(i), typ(t1) {}
+  Type_Array(int i, ::Type *t) : dim(i), typ(t) {}
   virtual void printOn(std::ostream &out) const override;
   virtual main_type get_type() override;
   virtual ::Type *getChild1() override;
   virtual int getDim() override;
   virtual bool equals(::Type *other) override;
   virtual void sem() override;
-  virtual llvm::Type *compile() const override { return PointerType::get(typ->compile(), 0); };
+  virtual llvm::Type *compile() const override;
 
 private:
   int dim;
@@ -316,7 +306,7 @@ public:
   virtual int getDim() override;
   virtual std::string get_id() override;
   virtual bool equals(::Type *other) override;
-  virtual llvm::Type *compile() const override { return typ == nullptr ? i64 : typ->compile(); };
+  virtual llvm::Type *compile() const override;
 
 private:
   ::Type *typ;
@@ -327,7 +317,7 @@ class Expr : public AST
 public:
   virtual void type_check(::Type *t);
   ::Type *typ;
-  virtual Value *compile() const { return nullptr; };
+  virtual Value *compile() const = 0;
 };
 
 class Int_Expr : public Expr
@@ -483,30 +473,31 @@ public:
   virtual Value *compile() const override;
 };
 
-class Array : public Expr
+class UnOp : public Expr
 {
 public:
-  Array(std::string s, std::vector<Expr *> *v) : id(s), expr_vec(v) {}
+  UnOp(unop_enum o, Expr *e) : op(o), expr(e) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   virtual Value *compile() const override;
 
 private:
-  std::string id;
-  std::vector<Expr *> *expr_vec;
+  unop_enum op;
+  Expr *expr;
 };
 
-class Dim : public Expr
+class BinOp : public Expr
 {
 public:
-  Dim(std::string s, int i = 1) : id(s), ind(i) {}
+  BinOp(Expr *e1, binop_enum o, Expr *e2) : left(e1), op(o), right(e2) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   virtual Value *compile() const override;
 
 private:
-  std::string id;
-  int ind;
+  Expr *left;
+  binop_enum op;
+  Expr *right;
 };
 
 class id_Expr : public Expr
@@ -533,6 +524,69 @@ private:
   std::string Id;
 };
 
+class call : public Expr
+{
+public:
+  call(std::string s, std::vector<Expr *> *v) : id(s), expr_vec(v) {}
+  virtual void printOn(std::ostream &out) const override;
+  virtual void sem() override;
+  virtual Value *compile() const override;
+
+private:
+  std::string id;
+  std::vector<Expr *> *expr_vec;
+};
+
+class Array : public Expr
+{
+public:
+  Array(std::string s, std::vector<Expr *> *v) : id(s), expr_vec(v) {}
+  virtual void printOn(std::ostream &out) const override;
+  virtual void sem() override;
+  virtual Value *compile() const override;
+
+private:
+  std::string id;
+  std::vector<Expr *> *expr_vec;
+};
+
+class Dim : public Expr
+{
+public:
+  Dim(std::string s, int i = 1) : id(s), ind(i) {}
+  virtual void printOn(std::ostream &out) const override;
+  virtual void sem() override;
+  virtual Value *compile() const override;
+
+private:
+  std::string id;
+  int ind;
+};
+
+class New : public Expr
+{
+public:
+  New(::Type *t) : ty(t) {}
+  virtual void printOn(std::ostream &out) const override;
+  virtual void sem() override;
+  virtual Value *compile() const override;
+
+private:
+  ::Type *ty;
+};
+
+class If : public Expr
+{
+public:
+  If(Expr *e1, Expr *e2, Expr *e3) : expr1(e1), expr2(e2), expr3(e3) {}
+  virtual void printOn(std::ostream &out) const override;
+  virtual void sem() override;
+  virtual Value *compile() const override;
+
+private:
+  Expr *expr1, *expr2, *expr3;
+};
+
 class While : public Expr
 {
 public:
@@ -548,8 +602,8 @@ private:
 class For : public Expr
 {
 public:
-  For(std::string id1, Expr *start1, Expr *end1, Expr *stmt1, bool down1)
-      : id(id1), start(start1), end(end1), stmt(stmt1), down(down1) {}
+  For(std::string s, Expr *e1, Expr *e2, Expr *e3, bool b)
+      : id(s), start(e1), end(e2), stmt(e3), down(b) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   virtual Value *compile() const override;
@@ -560,75 +614,10 @@ private:
   bool down;
 };
 
-class call : public Expr
-{
-public:
-  call(std::string s, std::vector<Expr *> *v) : id(s), expr_vec(v) {}
-  virtual void printOn(std::ostream &out) const override;
-  virtual void sem() override;
-  virtual Value *compile() const override;
-
-private:
-  std::string id;
-  std::vector<Expr *> *expr_vec;
-};
-
-class UnOp : public Expr
-{
-public:
-  UnOp(unop_enum op1, Expr *e1) : op(op1), expr(e1) {}
-  virtual void printOn(std::ostream &out) const override;
-  virtual void sem() override;
-  virtual Value *compile() const override;
-
-private:
-  unop_enum op;
-  Expr *expr;
-};
-
-class BinOp : public Expr
-{
-public:
-  BinOp(Expr *e1, binop_enum op1, Expr *e2) : left(e1), op(op1), right(e2) {}
-  virtual void printOn(std::ostream &out) const override;
-  virtual void sem() override;
-  virtual Value *compile() const override;
-
-private:
-  Expr *left;
-  binop_enum op;
-  Expr *right;
-};
-
-class If : public Expr
-{
-public:
-  If(Expr *e1, Expr *e2, Expr *e3) : expr1(e1), expr2(e2), expr3(e3) {}
-  virtual void printOn(std::ostream &out) const override;
-  virtual void sem() override;
-  virtual Value *compile() const override;
-
-private:
-  Expr *expr1, *expr2, *expr3;
-};
-
-class New : public Expr
-{
-public:
-  New(::Type *t) : ty(t) {}
-  virtual void printOn(std::ostream &out) const override;
-  virtual void sem() override;
-  virtual Value *compile() const override;
-
-private:
-  ::Type *ty;
-};
-
 class Pattern : public AST
 {
 public:
-  virtual void sem() {}
-  virtual Value *compile(Value *v) const { return nullptr; }
+  virtual Value *compile(Value *v) const = 0;
   ::Type *typ;
 };
 
@@ -759,7 +748,7 @@ private:
 class Clause : public AST
 {
 public:
-  Clause(Pattern *p1, Expr *e1) : pat(p1), expr(e1) {}
+  Clause(Pattern *p, Expr *e) : pat(p), expr(e) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   Pattern *pat;
@@ -769,27 +758,14 @@ public:
 class Match : public Expr
 {
 public:
-  Match(Expr *e1, std::vector<Clause *> *v) : expr(e1), vec(v) {}
+  Match(Expr *e, std::vector<Clause *> *v) : expr(e), cl_vec(v) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   virtual Value *compile() const override;
 
 private:
   Expr *expr;
-  std::vector<Clause *> *vec;
-};
-
-class Constr : public AST
-{
-public:
-  Constr(std::string s, std::vector<::Type *> *v) : Id(s), type_vec(v) {}
-  virtual void printOn(std::ostream &out) const override;
-  virtual void sem() override;
-  virtual void compile() const;
-  std::string id, Id;
-
-private:
-  std::vector<::Type *> *type_vec;
+  std::vector<Clause *> *cl_vec;
 };
 
 class Par : public AST
@@ -802,38 +778,11 @@ public:
   std::string id;
 };
 
-class TDef : public AST
-{
-public:
-  TDef(std::string s, std::vector<Constr *> *v) : id(s), constr_vec(v) {}
-  virtual void printOn(std::ostream &out) const override;
-  virtual void sem() override;
-  virtual void sem2();
-  virtual void compile() const;
-  virtual void compile2() const;
-
-private:
-  std::string id;
-  std::vector<Constr *> *constr_vec;
-};
-
-class TypeDef : public Stmt
-{
-public:
-  TypeDef(std::vector<TDef *> *v) : tdef_vec(v) {}
-  virtual void sem() override;
-  virtual void printOn(std::ostream &out) const override;
-  virtual void compile() const override;
-
-private:
-  std::vector<TDef *> *tdef_vec;
-};
-
 class Def : public AST
 {
 public:
-  virtual void sem2(){};
-  virtual void compile() const {}
+  virtual void sem2() {}
+  virtual void compile() const = 0;
   virtual void compile2() const {}
 };
 
@@ -894,4 +843,44 @@ public:
 private:
   LetDef *letdef;
   Expr *expr;
+};
+
+class Constr : public AST
+{
+public:
+  Constr(std::string s, std::vector<::Type *> *v) : Id(s), type_vec(v) {}
+  virtual void printOn(std::ostream &out) const override;
+  virtual void sem() override;
+  virtual void compile() const;
+  std::string id, Id;
+
+private:
+  std::vector<::Type *> *type_vec;
+};
+
+class TDef : public AST
+{
+public:
+  TDef(std::string s, std::vector<Constr *> *v) : id(s), constr_vec(v) {}
+  virtual void printOn(std::ostream &out) const override;
+  virtual void sem() override;
+  virtual void sem2();
+  virtual void compile() const;
+  virtual void compile2() const;
+
+private:
+  std::string id;
+  std::vector<Constr *> *constr_vec;
+};
+
+class TypeDef : public Stmt
+{
+public:
+  TypeDef(std::vector<TDef *> *v) : tdef_vec(v) {}
+  virtual void sem() override;
+  virtual void printOn(std::ostream &out) const override;
+  virtual void compile() const override;
+
+private:
+  std::vector<TDef *> *tdef_vec;
 };

@@ -5,7 +5,7 @@
 #include <map>
 #include <unordered_set>
 
-void semanticError(std::string msg);
+void semerror(std::string msg);
 class Type;
 
 class SymbolEntry
@@ -25,13 +25,17 @@ public:
   SymbolEntry *lookup(std::string &id)
   {
     if (locals.find(id) == locals.end())
+    {
       return nullptr;
+    }
     return &locals[id];
   }
   void insert(std::string &id, Type *t)
   {
     if (locals.find(id) != locals.end())
-      semanticError("Redeclared identifier " + id);
+    {
+      semerror("Redeclared identifier " + id);
+    }
     locals[id] = SymbolEntry(t, offset++);
     ++size;
   }
@@ -69,7 +73,7 @@ public:
         return e;
       }
     }
-    semanticError("Unknown identifier " + id);
+    semerror("Unknown identifier " + id);
     return nullptr;
   }
   void insert(std::string &id, Type *t)
@@ -88,47 +92,19 @@ public:
   void lookup(std::string &id)
   {
     if (types.count(id) == 0)
-      semanticError("Unknown identifier " + id);
+    {
+      semerror("Unknown identifier " + id);
+    }
   }
   void insert(std::string &id)
   {
     if (types.count(id) > 0)
-      semanticError("Redeclared identifier " + id);
+    {
+      semerror("Redeclared identifier " + id);
+    }
     types.insert(id);
   }
 
 private:
   std::unordered_set<std::string> types = {};
 };
-
-// class ConstrEntry
-// {
-// public:
-//   ConstrEntry(Type *t, std::vector<Type *> *v) : type(t), type_vec(v) {}
-//   ConstrEntry() {}
-//   Type *type;
-//   std::vector<Type *> *type_vec;
-// };
-
-// class ConstrTable
-// {
-// public:
-//   ConstrEntry *lookup(std::string &id)
-//   {
-//     if (locals.find(id) == locals.end())
-//     {
-//       semanticError("Unknown identifier " + id);
-//       return nullptr;
-//     }
-//     return &locals[id];
-//   }
-//   void insert(std::string &id, Type *t, std::vector<Type *> *v)
-//   {
-//     if (locals.find(id) != locals.end())
-//       semanticError("Redeclared identifier " + id);
-//     locals[id] = ConstrEntry(t, v);
-//   }
-
-// private:
-//   std::map<std::string, ConstrEntry> locals;
-// };

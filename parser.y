@@ -79,8 +79,8 @@ TypeDefTable tt;
 %nonassoc '!'
 %nonassoc T_new
 
-%union {
-
+%union
+{
   Program *program;
   std::vector<Stmt *> *stmt_vec;
   Stmt *stmt;
@@ -137,13 +137,11 @@ TypeDefTable tt;
 %type<clause> clause
 %type<clause_vec> or_clause_list
 %type<pattern_vec> pattern_list
+
 %%
 
 program:
-  stmt_list {
-    $$ = new Program($1);
-    prog = $$;
-   }
+  stmt_list { $$ = new Program($1); prog = $$; }
 ;
 
 stmt_list:
@@ -352,12 +350,6 @@ pattern_list:
 ;
 
 %%
-
-void yyerror(const char *msg)
-{
-  fprintf(stderr, "Error: %s\n", msg);
-  exit(1);
-}
 
 int main(int argc, char *argv[])
 {
