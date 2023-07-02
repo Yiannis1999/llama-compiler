@@ -80,15 +80,30 @@ void Par::printOn(std::ostream &out) const
   out << ")";
 }
 
-void Type_Unit::printOn(std::ostream &out) const { out << "Type_Unit()"; }
+void Type_Unit::printOn(std::ostream &out) const
+{
+  out << "Type_Unit()";
+}
 
-void Type_Int::printOn(std::ostream &out) const { out << "Type_Int()"; }
+void Type_Int::printOn(std::ostream &out) const
+{
+  out << "Type_Int()";
+}
 
-void Type_Char::printOn(std::ostream &out) const { out << "Type_Char()"; }
+void Type_Char::printOn(std::ostream &out) const
+{
+  out << "Type_Char()";
+}
 
-void Type_Bool::printOn(std::ostream &out) const { out << "Type_Bool()"; }
+void Type_Bool::printOn(std::ostream &out) const
+{
+  out << "Type_Bool()";
+}
 
-void Type_Float::printOn(std::ostream &out) const { out << "Type_Float()"; }
+void Type_Float::printOn(std::ostream &out) const
+{
+  out << "Type_Float()";
+}
 
 void Type_Func::printOn(std::ostream &out) const
 {
@@ -147,7 +162,10 @@ void Bool_Expr::printOn(std::ostream &out) const
   out << "Bool(" << boolean << ")";
 }
 
-void Unit_Expr::printOn(std::ostream &out) const { out << "Unit()"; }
+void Unit_Expr::printOn(std::ostream &out) const
+{
+  out << "Unit()";
+}
 
 void UnOp::printOn(std::ostream &out) const
 {
@@ -159,9 +177,15 @@ void BinOp::printOn(std::ostream &out) const
   out << "Binop(" << *left << ", " << op << ", " << *right << ")";
 }
 
-void id_Expr::printOn(std::ostream &out) const { out << "id(" << id << ")"; }
+void id_Expr::printOn(std::ostream &out) const
+{
+  out << "id(" << id << ")";
+}
 
-void Id_Expr::printOn(std::ostream &out) const { out << "Id(" << Id << ")"; }
+void Id_Expr::printOn(std::ostream &out) const
+{
+  out << "Id(" << Id << ")";
+}
 
 void call::printOn(std::ostream &out) const
 {
@@ -178,7 +202,10 @@ void Dim::printOn(std::ostream &out) const
   out << "Dim(" << ind << ", " << id << ")";
 }
 
-void New::printOn(std::ostream &out) const { out << "New(" << *typ << ")"; }
+void New::printOn(std::ostream &out) const
+{
+  out << "New(" << *typ << ")";
+}
 
 void LetIn::printOn(std::ostream &out) const
 {
@@ -210,7 +237,7 @@ void For::printOn(std::ostream &out) const
 
 void Match::printOn(std::ostream &out) const
 {
-  out << "Match(" << *expr << ", " << *cl_vec << ")";
+  out << "Match(" << *expr << ", " << *clause_vec << ")";
 }
 
 void Clause::printOn(std::ostream &out) const

@@ -396,7 +396,7 @@ int main(int argc, char *argv[])
     FILE *file = freopen(filename.c_str(), "r", stdin);
     if (file == nullptr)
     {
-      std::cerr << "Failed to open the file" << std::endl;
+      std::cerr << "Failed to open the file." << std::endl;
       return 1;
     }
     imm_file = new llvm::raw_fd_ostream(name + ".ll", error);

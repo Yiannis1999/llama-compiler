@@ -1,0 +1,8 @@
+let main = 
+    print_string "Enter a number between 1 and 3: ";
+    match (read_int ()) with
+      1 -> print_string "One.\n"
+    | 2 -> print_string "Two.\n"
+    | 3 -> print_string "Three.\n"
+    | x -> print_string "Invalid choice.\n"
+    end

@@ -1,4 +1,6 @@
 let inc (x : int) : int = x + 1
 let twice f x = f (f x)
 let y = twice inc 5 -- y is 7
-let main = print_int y
+let main =
+    print_int y;
+    print_string "\n"

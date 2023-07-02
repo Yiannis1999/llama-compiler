@@ -1,0 +1,19 @@
+type list = Nil | Cons of int list
+let a = Cons 1 (Cons 2 (Cons 3 Nil))
+let b = a
+let c = Cons 1 (Cons 2 (Cons 3 Nil))
+let d = Cons 1 (Cons 2 (Cons 2 Nil))
+let e = Cons 1 (Cons 2 Nil)
+let main =
+    print_bool (a = b);
+    print_string "\n";
+    print_bool (a == b);
+    print_string "\n";
+    print_bool (a = c);
+    print_string "\n";
+    print_bool (a == c);
+    print_string "\n";
+    print_bool (a = d);
+    print_string "\n";
+    print_bool (a = e);
+    print_string "\n"

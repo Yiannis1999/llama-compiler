@@ -1,0 +1,6 @@
+let a = new float
+let main =
+    a := 2.0 ** 6.0;
+    print_int (round(!a));
+    print_string "\n";
+    delete a

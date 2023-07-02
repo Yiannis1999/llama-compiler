@@ -758,14 +758,14 @@ public:
 class Match : public Expr
 {
 public:
-  Match(Expr *e, std::vector<Clause *> *v) : expr(e), cl_vec(v) {}
+  Match(Expr *e, std::vector<Clause *> *v) : expr(e), clause_vec(v) {}
   virtual void printOn(std::ostream &out) const override;
   virtual void sem() override;
   virtual Value *compile() const override;
 
 private:
   Expr *expr;
-  std::vector<Clause *> *cl_vec;
+  std::vector<Clause *> *clause_vec;
 };
 
 class Par : public AST

@@ -1,0 +1,5 @@
+let main =
+    (print_int 1; true) &&
+    (print_int 2; not true) &&
+    (print_int 3; false);
+    print_string "\n"

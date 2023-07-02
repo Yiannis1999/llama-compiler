@@ -134,11 +134,13 @@ void Program::llvm_compile_and_dump(bool optimize, raw_fd_ostream *imm_file, raw
   }
   // Optimize
   TheFPM->run(*main);
-  if (imm_file != nullptr) // Print out the IR
+  // Print out the IR
+  if (imm_file != nullptr)
   {
     TheModule->print(*imm_file, nullptr);
   }
-  if (asm_file != nullptr) // Print out the Assembly
+  // Print out the Assembly
+  if (asm_file != nullptr)
   {
     std::string TargetTriple = sys::getDefaultTargetTriple();
     TheModule->setTargetTriple(TargetTriple);
@@ -192,12 +194,12 @@ void LetDef::compile() const
 
 void NormalDef::compile() const
 {
-  if (par_vec->size() == 0) // constant
+  if (par_vec->size() == 0) // Constant
   {
     llvm::Type *t = typ->compile();
     new GlobalVariable(*TheModule, t, false, GlobalValue::PrivateLinkage, ConstantAggregateZero::get(t), id);
   }
-  else // function
+  else // Function
   {
     std::vector<llvm::Type *> from = {};
     for (Par *par : *par_vec)
@@ -214,13 +216,14 @@ void NormalDef::compile() const
 
 void NormalDef::compile2() const
 {
-  if (par_vec->size() == 0) // constant
+
+  if (par_vec->size() == 0) // Constant
   {
     Value *v = expr->compile();
     GlobalVariable *var = TheModule->getGlobalVariable(id, true);
     Builder.CreateStore(v, var);
   }
-  else // function
+  else // Function
   {
     std::vector<GlobalVariable *> global_vec;
     std::vector<llvm::Type *> members;
@@ -285,7 +288,7 @@ void MutableDef::compile() const
   std::vector<Value *> value_vec;
   DataLayout dataLayout("");
   Value *size = c64(dataLayout.getTypeSizeInBits(t) / 8);
-  if (expr_vec != nullptr)
+  if (expr_vec != nullptr) // Array
   {
     for (Expr *e : *expr_vec)
     {
@@ -302,7 +305,9 @@ void MutableDef::compile() const
     alloc = Builder.CreateGEP(alloc, {c64(expr_vec->size())});
     int i = 0;
     for (Value *v : value_vec)
+    {
       Builder.CreateStore(v, Builder.CreateGEP(alloc, {c64(--i)}));
+    }
   }
   Value *ptr = Builder.CreateBitCast(alloc, pt);
   Builder.CreateStore(ptr, var);
@@ -523,7 +528,7 @@ llvm::Type *Type_id::compile() const
 llvm::Type *Type_Undefined::compile() const
 {
   return typ == nullptr ? i64 : typ->compile();
-};
+}
 
 Value *Int_Expr::compile() const
 {
@@ -545,9 +550,13 @@ Value *Str_Expr::compile() const
   std::vector<Constant *> value_vec;
   value_vec.push_back(c8(str.length()));
   for (int i = 0; i < 7; i++)
+  {
     value_vec.push_back(c8(0));
+  }
   for (char c : str)
+  {
     value_vec.push_back(c8(c));
+  }
   value_vec.push_back(c8(0));
   ArrayType *str_type = ArrayType::get(i8, value_vec.size());
   Value *str = new GlobalVariable(*TheModule, str_type, true, GlobalValue::PrivateLinkage, ConstantArray::get(str_type, value_vec), "str");
@@ -746,13 +755,13 @@ Value *BinOp::compile() const
 
 Value *id_Expr::compile() const
 {
-  // constant or variable
+  // Constant or Variable
   GlobalVariable *var = TheModule->getGlobalVariable(id, true);
   if (var != nullptr)
   {
     return Builder.CreateLoad(var, "idtmp");
   }
-  // function
+  // Function
   Function *func = TheModule->getFunction(id);
   if (func != nullptr)
   {
@@ -778,7 +787,7 @@ Value *call::compile() const
     value_vec.push_back(expr->compile());
   }
   Function *func = TheModule->getFunction(id);
-  if (func == nullptr) // argument
+  if (func == nullptr) // Argument
   {
     GlobalVariable *var = TheModule->getGlobalVariable(id, true);
     Value *fptr = Builder.CreateLoad(var);
@@ -902,11 +911,11 @@ Value *For::compile() const
   Value *new_iter;
   if (down)
   {
-    new_iter = Builder.CreateSub(iter, c64(1), "new_iter");
+    new_iter = Builder.CreateSub(iter, c64(1));
   }
   else
   {
-    new_iter = Builder.CreateAdd(iter, c64(1), "new_iter");
+    new_iter = Builder.CreateAdd(iter, c64(1));
   }
   Builder.CreateStore(new_iter, var);
   Builder.CreateBr(LoopBB);
@@ -923,7 +932,7 @@ Value *Match::compile() const
   BasicBlock *ThenBB = nullptr;
   BasicBlock *ElseBB = nullptr;
   BasicBlock *AfterBB = BasicBlock::Create(TheContext, "endif", TheFunction);
-  for (Clause *cl : *cl_vec)
+  for (Clause *cl : *clause_vec)
   {
     ThenBB = BasicBlock::Create(TheContext, "then", TheFunction);
     ElseBB = BasicBlock::Create(TheContext, "else", TheFunction);
