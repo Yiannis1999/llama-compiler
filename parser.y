@@ -363,7 +363,7 @@ int main(int argc, char *argv[])
   llvm::raw_fd_ostream *imm_file = nullptr, *asm_file = nullptr;
   for (int i = 1; i < argc; ++i)
   {
-    if (strcmp(argv[i], "-o") == 0)
+    if (strcmp(argv[i], "-O") == 0)
     {
       optimize = true;
     }
@@ -389,8 +389,8 @@ int main(int argc, char *argv[])
   {
     if (filename == "")
     {
-      std::cerr << "Usage: ./llama [-o] [-f | -i | -p]" << std::endl;
-      std::cerr << "Usage: ./llama [-o] <file>" << std::endl;
+      std::cerr << "Usage: ./llama [-O] [-f | -i | -p]" << std::endl;
+      std::cerr << "Usage: ./llama [-O] <file>" << std::endl;
       return 1;
     }
     FILE *file = freopen(filename.c_str(), "r", stdin);

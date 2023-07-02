@@ -134,13 +134,11 @@ void Program::llvm_compile_and_dump(bool optimize, raw_fd_ostream *imm_file, raw
   }
   // Optimize
   TheFPM->run(*main);
-  // Print out the IR
-  if (imm_file != nullptr)
+  if (imm_file != nullptr) // Print out the IR
   {
     TheModule->print(*imm_file, nullptr);
   }
-  // Print out the Assembly
-  if (asm_file != nullptr)
+  if (asm_file != nullptr) // Print out the Assembly
   {
     std::string TargetTriple = sys::getDefaultTargetTriple();
     TheModule->setTargetTriple(TargetTriple);
@@ -160,6 +158,10 @@ void Program::llvm_compile_and_dump(bool optimize, raw_fd_ostream *imm_file, raw
     TargetOptions opt;
     Optional<Reloc::Model> RM = Optional<Reloc::Model>();
     TargetMachine *TheTargetMachine = TheTarget->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+    if (optimize)
+    {
+      TheTargetMachine->setOptLevel(CodeGenOpt::Aggressive);
+    }
     TheModule->setDataLayout(TheTargetMachine->createDataLayout());
     legacy::PassManager pass;
     if (TheTargetMachine->addPassesToEmitFile(pass, *asm_file, nullptr, CGFT_AssemblyFile))
@@ -168,7 +170,6 @@ void Program::llvm_compile_and_dump(bool optimize, raw_fd_ostream *imm_file, raw
       exit(1);
     }
     pass.run(*TheModule);
-    asm_file->flush();
   }
 }
 
@@ -302,6 +303,7 @@ void MutableDef::compile() const
   Value *alloc = Builder.CreateCall(TheModule->getFunction("malloc"), {size});
   if (expr_vec != nullptr)
   {
+    // Store dims
     alloc = Builder.CreateGEP(alloc, {c64(expr_vec->size())});
     int i = 0;
     for (Value *v : value_vec)
@@ -548,10 +550,10 @@ Value *Char_Expr::compile() const
 Value *Str_Expr::compile() const
 {
   std::vector<Constant *> value_vec;
-  value_vec.push_back(c8(str.length()));
-  for (int i = 0; i < 7; i++)
+  // Store dim
+  for (int i = 0; i < 8; i++)
   {
-    value_vec.push_back(c8(0));
+    value_vec.push_back(c8((str.length() >> (i * 8)) & 0xFF));
   }
   for (char c : str)
   {

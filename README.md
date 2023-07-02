@@ -1,6 +1,5 @@
 # llama-compiler
-## Introduction
-The Llama language is a relatively simple language that combines the functional and imperative programming models. It is based on a subset of OCaml, with which it shares many similarities. Its main features in brief are the following:
+Llama is a relatively simple language that combines the functional and imperative programming models. It is based on a subset of OCaml, with which it shares many similarities. Its main features in brief are the following:
 - Powerful type system with type inference.
 - Basic data types for integers, characters, boolean values and real numbers.
 - Pointers and tables of one or more dimensions. The memory locations where references and array elements point are mutable and assignable.
@@ -17,7 +16,7 @@ The Llama language is a relatively simple language that combines the functional 
 | llvm-12   | 12.0.1  |
 ## Usage
 ```sh
-./llama [-o] <file.lla>
+./llama [-O] <file.lla>
 ```
 ```sh
 ./llama [options]
@@ -25,17 +24,17 @@ The Llama language is a relatively simple language that combines the functional 
 Options
 | Flag | Description                           |
 |------|---------------------------------------|
-| -o   | Optimization flag.                    |
+| -O   | Optimization flag.                    |
 | -f   | Input from stdin, final code in stdout.|
-| -i   | Input from stdin, intermediate code in stdout. |
+| -i   | Input from stdin, intermediate code in stdout.|
 | -p   | Input from stdin, AST in stdout.       |
 
 Examples
 ```sh
-./llama -o ./programs/hello.lla
+./llama -O ./programs/hello.lla
 ```
 ```sh
-./llama -o -f
+./llama -O -f
 ```
 ```sh
 ./llama -i
