@@ -16,10 +16,10 @@ Llama is a relatively simple language that combines the functional and imperativ
 | llvm-12   | 12.0.1  |
 ## Usage
 ```sh
-./llama [-O] <file.lla>
+./llamac [-O] <file.lla>
 ```
 ```sh
-./llama [options]
+./llamac [options]
 ```
 Options
 | Flag | Description                           |
@@ -31,17 +31,17 @@ Options
 
 Examples
 ```sh
-./llama -O ./programs/hello.lla
+./llamac -O ./programs/hello.lla
 ```
 ```sh
-./llama -O -f
+./llamac -O -f
 ```
 ```sh
-./llama -i
+./llamac -i
 ```
 Note: You first need to compile the compiler.
 ## Linking
 ```sh
 gcc <file.s> ./lib/lib.a -o <file.out> -lm -no-pie
 ```
-Note: You first need to compile the library.
+Note: You first need to compile the library (i.e., run `make` inside the `lib` dir).

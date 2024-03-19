@@ -3,8 +3,8 @@ LLVMCONFIG=llvm-config-12
 CXXFLAGS=-Wall `$(LLVMCONFIG) --cxxflags` -g
 LDFLAGS=`$(LLVMCONFIG) --ldflags --system-libs --libs all`
 
-llama: lexer.o parser.o ast.o
-	$(CXX) $(CXXFLAGS) -o llama $^ $(LDFLAGS)
+llamac: lexer.o parser.o ast.o
+	$(CXX) $(CXXFLAGS) -o llamac $^ $(LDFLAGS)
 
 ast.o: ast.hpp symbol.hpp sem.hpp compile.hpp print.hpp
 
@@ -18,4 +18,4 @@ clean:
 	$(RM) lexer.cpp parser.cpp parser.hpp parser.output *.o
 
 distclean: clean
-	$(RM) llama
+	$(RM) llamac
